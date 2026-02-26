@@ -4,9 +4,8 @@
 *.xls
 *.pdf
 
-# 大容量JSONは Git LFS または Netlify Large Media で管理
-companies.json
-dist/companies.json
+# 大容量JSONはGitHub Pagesから直接配信
+# companies.json はGitで管理（99MB・GitHub上限内）
 
 # Python
 __pycache__/
