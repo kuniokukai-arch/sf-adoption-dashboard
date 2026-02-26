@@ -766,7 +766,9 @@ function getBaseData() {
   if (!needsDynamic) { _baseDataCache = prefData; return prefData; }
   let cos = allCompanies;
   if (state.founder)      cos = cos.filter(c => c.founder === '1');
-  if (state.aov.size > 0) cos = cos.filter(c => state.aov.has(c.aov));
+  // AOVはSF導入済み企業のみに設定されているため、
+  // 非SF企業はホワイトスペースとして全員残し、SF企業のみAOVで絞り込む
+  if (state.aov.size > 0) cos = cos.filter(c => c.sf !== '1' || state.aov.has(c.aov));
   _baseDataCache = buildPrefData(cos);
   return _baseDataCache;
 }
