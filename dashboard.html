@@ -724,10 +724,58 @@ function hexToRgb(hex){
 }
 
 // ============================================================
+// DYNAMIC AGGREGATION (for founder / AOV filters)
+// ============================================================
+const PROD_FIELD_MAP = {
+  'L1 Sales':'p_sales','L1 Service':'p_service','L1 Slack':'p_slack',
+  'L1 AI and Data':'p_ai','L1 Analytics':'p_analytics','L1 Integration':'p_integration'
+};
+
+function buildPrefData(companies) {
+  const byPref = {};
+  for (const c of companies) {
+    const p = c.pref; if (!p) continue;
+    if (!byPref[p]) byPref[p] = {
+      '都道府県':p,'全企業数':0,'SF導入企業数':0,'創業者フラグ企業数':0,
+      'SF導入率(%)':0,'ホワイトスペース数':0,
+      'L1 Sales_導入数':0,'L1 Service_導入数':0,'L1 Slack_導入数':0,
+      'L1 AI and Data_導入数':0,'L1 Analytics_導入数':0,'L1 Integration_導入数':0,
+    };
+    const d = byPref[p];
+    d['全企業数']++;
+    if (c.sf==='1')        d['SF導入企業数']++;
+    if (c.founder==='1')   d['創業者フラグ企業数']++;
+    if (c.p_sales==='1')       d['L1 Sales_導入数']++;
+    if (c.p_service==='1')     d['L1 Service_導入数']++;
+    if (c.p_slack==='1')       d['L1 Slack_導入数']++;
+    if (c.p_ai==='1')          d['L1 AI and Data_導入数']++;
+    if (c.p_analytics==='1')   d['L1 Analytics_導入数']++;
+    if (c.p_integration==='1') d['L1 Integration_導入数']++;
+  }
+  return Object.values(byPref).map(d => {
+    d['ホワイトスペース数'] = d['全企業数'] - d['SF導入企業数'];
+    d['SF導入率(%)'] = d['全企業数']>0 ? parseFloat((d['SF導入企業数']/d['全企業数']*100).toFixed(2)) : 0;
+    return d;
+  });
+}
+
+let _baseDataCache = null;
+function getBaseData() {
+  if (_baseDataCache) return _baseDataCache;
+  const needsDynamic = companiesLoaded && (state.founder || state.aov.size > 0);
+  if (!needsDynamic) { _baseDataCache = prefData; return prefData; }
+  let cos = allCompanies;
+  if (state.founder)      cos = cos.filter(c => c.founder === '1');
+  if (state.aov.size > 0) cos = cos.filter(c => state.aov.has(c.aov));
+  _baseDataCache = buildPrefData(cos);
+  return _baseDataCache;
+}
+
+// ============================================================
 // FILTER LOGIC
 // ============================================================
 function applyFilter(st, sourceData) {
-  let data = sourceData || prefData;
+  let data = sourceData !== undefined ? sourceData : getBaseData();
   if (st.region !== "ALL") data = data.filter(d => REGIONS[st.region]?.includes(d['都道府県']));
   if (st.pref   !== "ALL") data = data.filter(d => d['都道府県'] === st.pref);
   return data;
@@ -735,8 +783,6 @@ function applyFilter(st, sourceData) {
 
 function getFiltered() {
   let data = applyFilter(state);
-  // 創業者フラグON時: 全企業数・SF数・WS数を創業者フラグ企業数ベースに切り替え
-  // (prefDataには創業者フラグ企業数が含まれているので、founderモードでは表示を差し替える)
   data = [...data].sort((a,b)=>{
     const sf=state.sort;
     if(sf==='rate_desc') return b['SF導入率(%)']-a['SF導入率(%)'];
@@ -808,6 +854,7 @@ function renderKPI(filtered) {
 // RENDER ALL CHARTS
 // ============================================================
 function renderAll() {
+  _baseDataCache = null; // キャッシュクリア（フィルター変更反映）
   const filtered = getFiltered();
 
   renderKPI(filtered);
