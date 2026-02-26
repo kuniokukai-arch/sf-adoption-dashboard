@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salesforce 導入分析ダッシュボード</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card2: #222638;
+    --border: #2e3350;
+    --accent: #00a1e0;
+    --accent2: #ff6b35;
+    --green: #2ecc71;
+    --yellow: #f1c40f;
+    --text: #e8eaf0;
+    --muted: #8892b0;
+    --sf-blue: #0176d3;
+    --cmp-a: #00a1e0;
+    --cmp-b: #ff6b35;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; min-height: 100vh; }
+
+  /* ===== HEADER ===== */
+  .header {
+    background: linear-gradient(135deg, #0a0e1a 0%, #0d1a3a 50%, #0a1528 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo { width: 34px; height: 34px; background: var(--sf-blue); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: white; flex-shrink:0; }
+  .header h1 { font-size: 18px; font-weight: 700; }
+  .header-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .header-right { display:flex; align-items:center; gap:12px; }
+  .badge { background: var(--sf-blue); color: white; font-size: 11px; padding: 4px 12px; border-radius: 20px; font-weight: 600; white-space:nowrap; }
+
+  /* compare mode toggle */
+  .cmp-toggle-btn {
+    display:flex; align-items:center; gap:6px; padding:5px 14px; border-radius:8px;
+    font-size:12px; font-weight:700; cursor:pointer; border:1px solid var(--border);
+    color:var(--muted); background:transparent; transition:all 0.2s;
+    white-space:nowrap;
+  }
+  .cmp-toggle-btn:hover { border-color:var(--cmp-a); color:var(--cmp-a); }
+  .cmp-toggle-btn.active { border-color:var(--cmp-a); color:white; background:linear-gradient(90deg,rgba(0,161,224,0.25),rgba(255,107,53,0.25)); }
+  .cmp-dot { width:7px;height:7px;border-radius:50%;display:inline-block; }
+
+  /* ===== GLOBAL FILTER BAR ===== */
+  .filter-bar-wrap { position:sticky; top:71px; z-index:99; }
+
+  /* normal filter bar */
+  .filter-bar {
+    background: #13162280;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 32px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    backdrop-filter: blur(6px);
+  }
+  /* compare filter bar */
+  .cmp-filter-bar {
+    background:#13162299;
+    border-bottom:1px solid var(--border);
+    padding:8px 32px;
+    display:none; gap:0; flex-wrap:wrap;
+    backdrop-filter:blur(6px);
+  }
+  .cmp-filter-bar.visible { display:flex; flex-direction:column; gap:0; }
+  .cmp-row {
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    padding:7px 0;
+  }
+  .cmp-row:first-child { border-bottom:1px solid rgba(255,255,255,0.05); }
+  .cmp-label {
+    font-size:11px; font-weight:800; letter-spacing:0.5px; padding:3px 10px;
+    border-radius:12px; white-space:nowrap; flex-shrink:0;
+  }
+  .cmp-label.a { background:rgba(0,161,224,0.2); color:var(--cmp-a); border:1px solid rgba(0,161,224,0.4); }
+  .cmp-label.b { background:rgba(255,107,53,0.2); color:var(--cmp-b); border:1px solid rgba(255,107,53,0.4); }
+
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .filter-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+  .filter-select {
+    background: var(--card2); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 28px 5px 10px; border-radius: 8px; font-size: 12px; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238892b0'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    min-width: 130px;
+  }
+  .filter-select:focus { outline: none; border-color: var(--accent); }
+  .chip-row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .chip {
+    padding: 4px 10px; border-radius: 16px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); color: var(--muted); background: transparent;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { color: white; border-color: transparent; }
+  .filter-reset {
+    margin-left: auto; padding: 5px 14px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    cursor: pointer; border: 1px solid var(--border); color: var(--muted); background: transparent;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .filter-reset:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ===== LAYOUT ===== */
+  .main { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 22px; }
+  .kpi-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 22px; position: relative; overflow: hidden;
+  }
+  .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent-color,var(--accent)); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi-value { font-size: 32px; font-weight: 800; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .kpi-icon { position: absolute; top: 14px; right: 18px; font-size: 26px; opacity: 0.18; }
+
+  /* compare KPI */
+  .kpi-cmp { display:flex; flex-direction:column; gap:6px; }
+  .kpi-cmp-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .kpi-cmp-val { font-size:22px; font-weight:800; }
+  .kpi-cmp-tag { font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; flex-shrink:0; }
+  .kpi-cmp-tag.a { background:rgba(0,161,224,0.2); color:var(--cmp-a); }
+  .kpi-cmp-tag.b { background:rgba(255,107,53,0.2); color:var(--cmp-b); }
+  .kpi-cmp-diff { font-size:11px; color:var(--muted); margin-top:4px; border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .full { margin-bottom: 20px; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .card-title {
+    font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-wrap:wrap;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink:0; }
+  .chart-wrap { position: relative; }
+  .h340 { height: 340px; }
+  .h280 { height: 280px; }
+  .h240 { height: 240px; }
+
+  /* ===== PRODUCT CARDS ===== */
+  .product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .product-card {
+    background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; position: relative; overflow: hidden;
+  }
+  .product-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--p-color); }
+  .product-name { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+  .product-count { font-size: 20px; font-weight: 800; }
+  .product-share { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  /* compare product card */
+  .product-card-cmp { font-size:10px; color:var(--muted); margin-top:4px; border-top:1px solid rgba(255,255,255,0.05); padding-top:4px; }
+  .product-cmp-a { color:var(--cmp-a); font-weight:700; }
+  .product-cmp-b { color:var(--cmp-b); font-weight:700; }
+
+  /* ===== TABLE ===== */
+  .pref-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .pref-table th { text-align: left; padding: 7px 10px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  .pref-table th:hover { color: var(--accent); }
+  .pref-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+  .pref-table tr:hover td { background: rgba(255,255,255,0.025); }
+  .rank { color: var(--muted); font-size: 10px; font-weight: 700; }
+  .pref-name { font-weight: 600; }
+  .rate-bar-wrap { display: flex; align-items: center; gap: 6px; }
+  .rate-bar { height: 5px; border-radius: 3px; background: var(--accent); min-width: 2px; transition: width 0.3s; }
+  .rate-val { font-size: 11px; font-weight: 700; min-width: 38px; }
+  .ws-badge { background: rgba(255,107,53,0.15); color: var(--accent2); border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600; }
+  .scroll-y { overflow-y: auto; max-height: 380px; }
+  .scroll-y::-webkit-scrollbar { width: 3px; }
+  .scroll-y::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ===== FILTER ACTIVE INDICATOR ===== */
+  .active-filter-hint { font-size: 11px; color: var(--accent); margin-left: 6px; font-weight: 600; }
+
+  /* ===== COMPANY LIST ===== */
+  .company-section { margin-bottom: 30px; }
+  .company-toolbar {
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;
+  }
+  .company-filter-row {
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    margin-bottom:10px; padding:10px 14px;
+    background:var(--card2); border:1px solid var(--border); border-radius:10px;
+  }
+  .company-filter-group { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .company-filter-label {
+    font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase;
+    letter-spacing:0.5px; white-space:nowrap;
+  }
+  .company-search {
+    flex:1; min-width:180px; max-width:280px;
+    background:var(--card2); border:1px solid var(--border); color:var(--text);
+    padding:7px 14px; border-radius:8px; font-size:13px;
+  }
+  .company-search:focus { outline:none; border-color:var(--accent); }
+  .company-search::placeholder { color:var(--muted); }
+  .seg-btn {
+    padding:4px 11px; border-radius:20px; font-size:11px; font-weight:700;
+    cursor:pointer; border:1px solid var(--border); color:var(--muted); background:transparent; transition:all 0.15s;
+  }
+  .seg-btn.active { background:var(--sf-blue); border-color:transparent; color:white; }
+  .seg-btn:hover:not(.active) { border-color:var(--accent); color:var(--accent); }
+  /* AOV chip */
+  .aov-chip {
+    padding:3px 9px; border-radius:14px; font-size:10px; font-weight:700;
+    cursor:pointer; border:1px solid var(--border); color:var(--muted); background:transparent; transition:all 0.15s; white-space:nowrap;
+  }
+  .aov-chip.active { background:rgba(124,92,191,0.85); border-color:transparent; color:white; }
+  .aov-chip:hover:not(.active) { border-color:#7c5cbf; color:#7c5cbf; }
+  /* range select */
+  .range-select {
+    background:var(--card2); border:1px solid var(--border); color:var(--text);
+    padding:4px 24px 4px 8px; border-radius:8px; font-size:11px; cursor:pointer;
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%238892b0'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 6px center;
+    min-width:110px;
+  }
+  /* founder toggle */
+  .founder-toggle {
+    display:flex; align-items:center; gap:6px; cursor:pointer;
+    padding:4px 10px; border-radius:20px; border:1px solid var(--border);
+    font-size:11px; font-weight:700; color:var(--muted); background:transparent; transition:all 0.15s;
+  }
+  .founder-toggle.active { background:rgba(241,196,15,0.2); border-color:#f1c40f; color:#f1c40f; }
+  .founder-toggle:hover:not(.active) { border-color:#f1c40f; color:#f1c40f; }
+  /* filter reset small */
+  .filter-clear-btn {
+    padding:3px 10px; border-radius:8px; font-size:10px; font-weight:700;
+    cursor:pointer; border:1px solid var(--border); color:var(--muted); background:transparent; transition:all 0.15s; margin-left:auto;
+  }
+  .filter-clear-btn:hover { border-color:var(--accent2); color:var(--accent2); }
+  .company-count { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .company-sort-select {
+    background:var(--card2); border:1px solid var(--border); color:var(--text);
+    padding:5px 28px 5px 10px; border-radius:8px; font-size:12px; cursor:pointer;
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238892b0'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 8px center;
+    min-width:140px;
+  }
+
+  .company-table-wrap { overflow-x:auto; }
+  .company-table { width:100%; border-collapse:collapse; font-size:12px; min-width:900px; }
+  .company-table th {
+    text-align:left; padding:8px 10px; color:var(--muted); font-size:10px; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border);
+    cursor:pointer; user-select:none; white-space:nowrap; position:sticky; top:0; background:var(--card);
+  }
+  .company-table th:hover { color:var(--accent); }
+  .company-table td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+  .company-table tr:hover td { background:rgba(255,255,255,0.025); }
+  .company-name { font-weight:600; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .company-pref { font-size:11px; color:var(--accent); font-weight:600; }
+  .company-industry { font-size:11px; color:var(--muted); max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sf-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; }
+  .sf-badge.yes { background:rgba(0,161,224,0.2); color:var(--accent); border:1px solid rgba(0,161,224,0.4); }
+  .sf-badge.no  { background:rgba(255,107,53,0.1); color:var(--accent2); border:1px solid rgba(255,107,53,0.3); }
+  .score-bar-wrap { display:flex; align-items:center; gap:5px; }
+  .score-bar { height:4px; border-radius:2px; background:var(--accent); }
+  .products-cell { display:flex; flex-wrap:wrap; gap:3px; }
+  .prod-tag {
+    font-size:9px; font-weight:700; padding:1px 5px; border-radius:8px; white-space:nowrap;
+  }
+  .pagination {
+    display:flex; align-items:center; justify-content:center; gap:6px; margin-top:16px; flex-wrap:wrap;
+  }
+  .page-btn {
+    padding:5px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;
+    border:1px solid var(--border); color:var(--muted); background:transparent; transition:all 0.15s;
+  }
+  .page-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+  .page-btn.active { background:var(--sf-blue); border-color:transparent; color:white; }
+  .page-btn:disabled { opacity:0.35; cursor:not-allowed; }
+  .page-info { font-size:12px; color:var(--muted); }
+  .loading-msg { text-align:center; padding:40px; color:var(--muted); font-size:14px; }
+  .load-bar { width:200px; height:4px; background:var(--border); border-radius:2px; margin:10px auto; overflow:hidden; }
+  .load-bar-inner { height:100%; background:var(--accent); border-radius:2px; animation:loadpulse 1.2s ease-in-out infinite; }
+  @keyframes loadpulse { 0%{width:0%} 50%{width:80%} 100%{width:100%} }
+
+  /* compare strip */
+  .compare-strip {
+    background: linear-gradient(90deg, rgba(0,161,224,0.08), rgba(255,107,53,0.08));
+    border: 1px solid rgba(0,161,224,0.2);
+    border-radius: 10px;
+    padding: 8px 16px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+  .compare-strip.visible { display:flex; }
+  .cstrip-a { color:var(--cmp-a); font-weight:700; }
+  .cstrip-b { color:var(--cmp-b); font-weight:700; }
+  .cstrip-vs { color:var(--muted); font-size:11px; font-weight:700; }
+
+  @media (max-width: 1100px) {
+    .kpi-row { grid-template-columns: repeat(2,1fr); }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .product-grid { grid-template-columns: repeat(3,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== PASSWORD GATE ===== -->
+<div id="pwGate" style="
+  position:fixed;inset:0;z-index:9999;
+  background:#0f1117;
+  display:flex;align-items:center;justify-content:center;
+">
+  <div style="
+    background:#1a1d27;border:1px solid #2e3350;border-radius:16px;
+    padding:40px 48px;text-align:center;width:340px;
+    box-shadow:0 24px 64px rgba(0,0,0,.6);
+  ">
+    <div style="width:48px;height:48px;background:#0176d3;border-radius:12px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:22px;font-weight:900;color:#fff;margin:0 auto 20px;">S</div>
+    <div style="font-size:18px;font-weight:700;color:#e8eaf0;margin-bottom:6px;">SF 導入分析ダッシュボード</div>
+    <div style="font-size:12px;color:#8892b0;margin-bottom:28px;">Internal Use Only</div>
+    <input id="pwInput" type="password" placeholder="パスワードを入力" style="
+      width:100%;padding:10px 14px;border-radius:8px;
+      background:#0f1117;border:1px solid #2e3350;color:#e8eaf0;
+      font-size:14px;outline:none;margin-bottom:12px;
+    " />
+    <div id="pwError" style="font-size:12px;color:#e74c3c;min-height:18px;margin-bottom:10px;"></div>
+    <button onclick="checkPw()" style="
+      width:100%;padding:10px;border-radius:8px;border:none;
+      background:#0176d3;color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+    ">ログイン</button>
+  </div>
+</div>
+<script>
+(function(){
+  if(sessionStorage.getItem('sf_auth')==='ok'){
+    document.getElementById('pwGate').style.display='none';
+  }
+})();
+function checkPw(){
+  const v = document.getElementById('pwInput').value;
+  if(v==='sfdc1234'){
+    sessionStorage.setItem('sf_auth','ok');
+    document.getElementById('pwGate').style.display='none';
+  } else {
+    document.getElementById('pwError').textContent='パスワードが違います';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+  }
+}
+document.addEventListener('DOMContentLoaded',function(){
+  const inp = document.getElementById('pwInput');
+  if(inp) inp.addEventListener('keydown',function(e){ if(e.key==='Enter') checkPw(); });
+});
+</script>
+
+<!-- ===== HEADER ===== -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">SF</div>
+    <div>
+      <h1>Salesforce 導入分析ダッシュボード</h1>
+      <div class="header-sub">TSRオフラインDB × Org62 | 2025年7月時点</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="cmp-toggle-btn" id="cmpToggleBtn">
+      <span class="cmp-dot" style="background:var(--cmp-a)"></span>
+      <span class="cmp-dot" style="background:var(--cmp-b)"></span>
+      比較モード
+    </button>
+    <div class="badge" id="headerBadge">253,557社分析</div>
+  </div>
+</div>
+
+<!-- ===== FILTER BARS ===== -->
+<div class="filter-bar-wrap">
+  <!-- 通常フィルターバー -->
+  <div class="filter-bar" id="normalFilterBar">
+    <div class="filter-group">
+      <span class="filter-label">地方</span>
+      <div class="chip-row" id="regionChips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">都道府県</span>
+      <select class="filter-select" id="prefSelect"><option value="ALL">全都道府県</option></select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">プロダクト</span>
+      <div class="chip-row" id="productChips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">AOV</span>
+      <div class="chip-row" id="globalAovChips"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">創業者</span>
+      <button class="chip" id="globalFounderChip">🌱 創業者のみ</button>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">ソート</span>
+      <select class="filter-select" id="sortSelect" style="min-width:140px">
+        <option value="rate_desc">導入率 高い順</option>
+        <option value="rate_asc">導入率 低い順</option>
+        <option value="sf_desc">SF企業数 多い順</option>
+        <option value="ws_desc">ホワイトスペース 多い順</option>
+        <option value="total_desc">全企業数 多い順</option>
+      </select>
+    </div>
+    <button class="filter-reset" id="resetBtn">🔄 リセット</button>
+  </div>
+
+  <!-- 比較フィルターバー -->
+  <div class="cmp-filter-bar" id="cmpFilterBar">
+    <!-- A -->
+    <div class="cmp-row">
+      <span class="cmp-label a">A</span>
+      <div class="filter-group">
+        <span class="filter-label">地方</span>
+        <div class="chip-row" id="cmpRegionChipsA"></div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">都道府県</span>
+        <select class="filter-select" id="cmpPrefSelectA"><option value="ALL">全都道府県</option></select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">プロダクト</span>
+        <div class="chip-row" id="cmpProductChipsA"></div>
+      </div>
+    </div>
+    <!-- B -->
+    <div class="cmp-row">
+      <span class="cmp-label b">B</span>
+      <div class="filter-group">
+        <span class="filter-label">地方</span>
+        <div class="chip-row" id="cmpRegionChipsB"></div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">都道府県</span>
+        <select class="filter-select" id="cmpPrefSelectB"><option value="ALL">全都道府県</option></select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">プロダクト</span>
+        <div class="chip-row" id="cmpProductChipsB"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MAIN ===== -->
+<div class="main">
+
+  <!-- compare strip (only visible in compare mode) -->
+  <div class="compare-strip" id="compareStrip">
+    <span>📊 比較モード：</span>
+    <span class="cstrip-a" id="cstripA">A: 全国</span>
+    <span class="cstrip-vs">vs</span>
+    <span class="cstrip-b" id="cstripB">B: 全国</span>
+    <span style="margin-left:auto;color:var(--muted);font-size:11px">各グラフに A（青）vs B（オレンジ）のデータを重ねて表示しています</span>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi-card" style="--accent-color:#0176d3">
+      <div class="kpi-label">全企業数</div>
+      <div id="kpi-total-wrap">
+        <div class="kpi-value" style="color:#0176d3" id="kpi-total">253,557</div>
+        <div class="kpi-sub">対象フィルター内</div>
+      </div>
+      <div class="kpi-icon">🏢</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#00a1e0">
+      <div class="kpi-label">SF導入企業数</div>
+      <div id="kpi-sf-wrap">
+        <div class="kpi-value" style="color:#00a1e0" id="kpi-sf">19,761</div>
+        <div class="kpi-sub" id="kpi-sf-sub">全体の 7.8%</div>
+      </div>
+      <div class="kpi-icon">☁️</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#ff6b35">
+      <div class="kpi-label">ホワイトスペース</div>
+      <div id="kpi-ws-wrap">
+        <div class="kpi-value" style="color:#ff6b35" id="kpi-ws">228,728</div>
+        <div class="kpi-sub" id="kpi-ws-sub">SF未導入の潜在顧客</div>
+      </div>
+      <div class="kpi-icon">🎯</div>
+    </div>
+    <div class="kpi-card" style="--accent-color:#7c5cbf">
+      <div class="kpi-label">SF導入率</div>
+      <div id="kpi-rate-wrap">
+        <div class="kpi-value" style="color:#7c5cbf" id="kpi-rate">7.8%</div>
+        <div class="kpi-sub" id="kpi-rate-sub">フィルター内平均</div>
+      </div>
+      <div class="kpi-icon">📊</div>
+    </div>
+  </div>
+
+  <!-- Row 1: 導入率棒グラフ + プロダクトシェア -->
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">
+        <span class="dot" style="background:#00a1e0"></span>
+        都道府県別 SF導入率
+        <span class="active-filter-hint" id="prefRateHint"></span>
+      </div>
+      <div class="chart-wrap h340"><canvas id="prefRateChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="dot" style="background:#ff6b35"></span>
+        プロダクト別 SF企業内シェア
+      </div>
+      <div class="product-grid" id="productCards"></div>
+      <div class="chart-wrap h240"><canvas id="productDonut"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 2: テーブル + 積み上げ棒 -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">
+        <span class="dot" style="background:#2ecc71"></span>
+        都道府県別 詳細ランキング
+        <span class="active-filter-hint" id="tableHint"></span>
+      </div>
+      <div class="scroll-y">
+        <table class="pref-table">
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="dot" style="background:#f1c40f"></span>
+        SF導入 vs ホワイトスペース（上位15）
+        <span class="active-filter-hint" id="stackedHint"></span>
+      </div>
+      <div class="chart-wrap h340"><canvas id="stackedBar"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 3: 絶対数 + 散布図 -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">
+        <span class="dot" style="background:#00a1e0"></span>
+        プロダクト別 SF企業数（上位15都道府県）
+        <span class="active-filter-hint" id="countHint"></span>
+      </div>
+      <div class="chart-wrap h340"><canvas id="sfCountChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">
+        <span class="dot" style="background:#f1c40f"></span>
+        導入率 vs ホワイトスペース（散布図）
+      </div>
+      <div class="chart-wrap h340"><canvas id="scatterChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ===== COMPANY LIST ===== -->
+  <div class="company-section full">
+    <div class="card">
+      <div class="card-title">
+        <span class="dot" style="background:#2ecc71"></span>
+        企業一覧
+        <span class="active-filter-hint" id="companyHint"></span>
+      </div>
+      <!-- ツールバー行1: 検索・SF絞り込み・ソート -->
+      <div class="company-toolbar">
+        <input class="company-search" id="companySearch" placeholder="🔍 会社名・業種で検索...">
+        <div style="display:flex;gap:5px">
+          <button class="seg-btn active" data-sf="all">全社</button>
+          <button class="seg-btn" data-sf="sf">SF導入</button>
+          <button class="seg-btn" data-sf="ws">ホワイトスペース</button>
+        </div>
+        <button class="founder-toggle" id="founderToggle">🌱 創業者フラグ</button>
+        <select class="company-sort-select" id="companySortSel">
+          <option value="sales_desc">売上高 高い順</option>
+          <option value="sales_asc">売上高 低い順</option>
+          <option value="emp_desc">従業員数 多い順</option>
+          <option value="score_desc">評点 高い順</option>
+          <option value="rate_desc">SF導入率 高い順</option>
+        </select>
+        <span class="company-count" id="companyCount">読み込み中...</span>
+      </div>
+      <!-- ツールバー行2: 詳細フィルター -->
+      <div class="company-filter-row">
+        <!-- AOV Band -->
+        <div class="company-filter-group">
+          <span class="company-filter-label">AOV Band</span>
+          <div id="aovChips" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        </div>
+        <!-- 売上高 -->
+        <div class="company-filter-group">
+          <span class="company-filter-label">売上高</span>
+          <select class="range-select" id="salesMinSel">
+            <option value="0">下限なし</option>
+            <option value="100000">1億以上</option>
+            <option value="1000000">10億以上</option>
+            <option value="10000000">100億以上</option>
+            <option value="1000000000">1兆以上</option>
+          </select>
+          <span style="color:var(--muted);font-size:11px">〜</span>
+          <select class="range-select" id="salesMaxSel">
+            <option value="999999999999">上限なし</option>
+            <option value="100000">1億未満</option>
+            <option value="1000000">10億未満</option>
+            <option value="10000000">100億未満</option>
+            <option value="1000000000">1兆未満</option>
+          </select>
+        </div>
+        <!-- 従業員数 -->
+        <div class="company-filter-group">
+          <span class="company-filter-label">従業員数</span>
+          <select class="range-select" id="empMinSel">
+            <option value="0">下限なし</option>
+            <option value="10">10名以上</option>
+            <option value="50">50名以上</option>
+            <option value="100">100名以上</option>
+            <option value="500">500名以上</option>
+            <option value="1000">1,000名以上</option>
+            <option value="5000">5,000名以上</option>
+          </select>
+          <span style="color:var(--muted);font-size:11px">〜</span>
+          <select class="range-select" id="empMaxSel">
+            <option value="9999999">上限なし</option>
+            <option value="9">9名以下</option>
+            <option value="49">49名以下</option>
+            <option value="99">99名以下</option>
+            <option value="499">499名以下</option>
+            <option value="999">999名以下</option>
+            <option value="4999">4,999名以下</option>
+          </select>
+        </div>
+        <!-- 評点 -->
+        <div class="company-filter-group">
+          <span class="company-filter-label">評点</span>
+          <select class="range-select" id="scoreMinSel">
+            <option value="0">下限なし</option>
+            <option value="40">40以上</option>
+            <option value="50">50以上</option>
+            <option value="60">60以上</option>
+            <option value="70">70以上</option>
+          </select>
+        </div>
+        <button class="filter-clear-btn" id="companyFilterClear">🔄 リセット</button>
+      </div>
+      <div id="companyTableWrap" class="company-table-wrap">
+        <div class="loading-msg">
+          企業データを読み込んでいます...<br>
+          <div class="load-bar"><div class="load-bar-inner"></div></div>
+          <span style="font-size:11px;color:var(--muted)">companies.jsonを取得中 (約100MB)</span>
+        </div>
+      </div>
+      <div class="pagination" id="companyPagination"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ============================================================
+// PREF DATA (embedded)
+// ============================================================
+const prefData = [{"都道府県":"東京都","全企業数":39167,"SF導入企業数":13875,"創業者フラグ企業数":6558,"SF導入率(%)":35.43,"ホワイトスペース数":25292,"L1 Sales_導入数":7178,"L1 Service_導入数":4891,"L1 Slack_導入数":5984,"L1 AI and Data_導入数":920,"L1 Analytics_導入数":5736,"L1 Integration_導入数":592},{"都道府県":"大阪府","全企業数":17881,"SF導入企業数":1982,"創業者フラグ企業数":2281,"SF導入率(%)":11.08,"ホワイトスペース数":15899,"L1 Sales_導入数":985,"L1 Service_導入数":662,"L1 Slack_導入数":554,"L1 AI and Data_導入数":93,"L1 Analytics_導入数":743,"L1 Integration_導入数":50},{"都道府県":"愛知県","全企業数":13178,"SF導入企業数":1319,"創業者フラグ企業数":1334,"SF導入率(%)":10.01,"ホワイトスペース数":11859,"L1 Sales_導入数":766,"L1 Service_導入数":566,"L1 Slack_導入数":592,"L1 AI and Data_導入数":368,"L1 Analytics_導入数":680,"L1 Integration_導入数":364},{"都道府県":"京都府","全企業数":5004,"SF導入企業数":412,"創業者フラグ企業数":486,"SF導入率(%)":8.23,"ホワイトスペース数":4592,"L1 Sales_導入数":187,"L1 Service_導入数":153,"L1 Slack_導入数":112,"L1 AI and Data_導入数":30,"L1 Analytics_導入数":143,"L1 Integration_導入数":24},{"都道府県":"神奈川県","全企業数":12755,"SF導入企業数":1043,"創業者フラグ企業数":1497,"SF導入率(%)":8.18,"ホワイトスペース数":11712,"L1 Sales_導入数":443,"L1 Service_導入数":318,"L1 Slack_導入数":220,"L1 AI and Data_導入数":54,"L1 Analytics_導入数":358,"L1 Integration_導入数":26},{"都道府県":"福岡県","全企業数":9510,"SF導入企業数":681,"創業者フラグ企業数":1167,"SF導入率(%)":7.16,"ホワイトスペース数":8829,"L1 Sales_導入数":312,"L1 Service_導入数":160,"L1 Slack_導入数":155,"L1 AI and Data_導入数":15,"L1 Analytics_導入数":206,"L1 Integration_導入数":12},{"都道府県":"沖縄県","全企業数":2737,"SF導入企業数":163,"創業者フラグ企業数":362,"SF導入率(%)":5.96,"ホワイトスペース数":2574,"L1 Sales_導入数":68,"L1 Service_導入数":36,"L1 Slack_導入数":33,"L1 AI and Data_導入数":2,"L1 Analytics_導入数":25,"L1 Integration_導入数":2},{"都道府県":"富山県","全企業数":2474,"SF導入企業数":137,"創業者フラグ企業数":159,"SF導入率(%)":5.54,"ホワイトスペース数":2337,"L1 Sales_導入数":48,"L1 Service_導入数":29,"L1 Slack_導入数":10,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":33,"L1 Integration_導入数":0},{"都道府県":"兵庫県","全企業数":8948,"SF導入企業数":477,"創業者フラグ企業数":788,"SF導入率(%)":5.33,"ホワイトスペース数":8471,"L1 Sales_導入数":186,"L1 Service_導入数":118,"L1 Slack_導入数":98,"L1 AI and Data_導入数":3,"L1 Analytics_導入数":170,"L1 Integration_導入数":1},{"都道府県":"岡山県","全企業数":4014,"SF導入企業数":206,"創業者フラグ企業数":356,"SF導入率(%)":5.13,"ホワイトスペース数":3808,"L1 Sales_導入数":104,"L1 Service_導入数":59,"L1 Slack_導入数":68,"L1 AI and Data_導入数":1,"L1 Analytics_導入数":79,"L1 Integration_導入数":17},{"都道府県":"広島県","全企業数":6223,"SF導入企業数":317,"創業者フラグ企業数":595,"SF導入率(%)":5.09,"ホワイトスペース数":5906,"L1 Sales_導入数":153,"L1 Service_導入数":108,"L1 Slack_導入数":79,"L1 AI and Data_導入数":50,"L1 Analytics_導入数":133,"L1 Integration_導入数":43},{"都道府県":"石川県","全企業数":2535,"SF導入企業数":127,"創業者フラグ企業数":178,"SF導入率(%)":5.01,"ホワイトスペース数":2408,"L1 Sales_導入数":36,"L1 Service_導入数":25,"L1 Slack_導入数":22,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":47,"L1 Integration_導入数":0},{"都道府県":"千葉県","全企業数":8418,"SF導入企業数":371,"創業者フラグ企業数":1062,"SF導入率(%)":4.41,"ホワイトスペース数":8047,"L1 Sales_導入数":144,"L1 Service_導入数":102,"L1 Slack_導入数":70,"L1 AI and Data_導入数":3,"L1 Analytics_導入数":89,"L1 Integration_導入数":3},{"都道府県":"静岡県","全企業数":6871,"SF導入企業数":285,"創業者フラグ企業数":579,"SF導入率(%)":4.15,"ホワイトスペース数":6586,"L1 Sales_導入数":137,"L1 Service_導入数":65,"L1 Slack_導入数":58,"L1 AI and Data_導入数":19,"L1 Analytics_導入数":87,"L1 Integration_導入数":5},{"都道府県":"鹿児島県","全企業数":2909,"SF導入企業数":120,"創業者フラグ企業数":229,"SF導入率(%)":4.13,"ホワイトスペース数":2789,"L1 Sales_導入数":62,"L1 Service_導入数":19,"L1 Slack_導入数":13,"L1 AI and Data_導入数":2,"L1 Analytics_導入数":14,"L1 Integration_導入数":0},{"都道府県":"熊本県","全企業数":3524,"SF導入企業数":145,"創業者フラグ企業数":291,"SF導入率(%)":4.11,"ホワイトスペース数":3379,"L1 Sales_導入数":74,"L1 Service_導入数":10,"L1 Slack_導入数":19,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":33,"L1 Integration_導入数":1},{"都道府県":"埼玉県","全企業数":10281,"SF導入企業数":410,"創業者フラグ企業数":1133,"SF導入率(%)":3.99,"ホワイトスペース数":9871,"L1 Sales_導入数":178,"L1 Service_導入数":108,"L1 Slack_導入数":61,"L1 AI and Data_導入数":7,"L1 Analytics_導入数":101,"L1 Integration_導入数":9},{"都道府県":"佐賀県","全企業数":1902,"SF導入企業数":72,"創業者フラグ企業数":123,"SF導入率(%)":3.79,"ホワイトスペース数":1830,"L1 Sales_導入数":33,"L1 Service_導入数":8,"L1 Slack_導入数":7,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":6,"L1 Integration_導入数":0},{"都道府県":"宮城県","全企業数":4492,"SF導入企業数":162,"創業者フラグ企業数":731,"SF導入率(%)":3.61,"ホワイトスペース数":4330,"L1 Sales_導入数":61,"L1 Service_導入数":31,"L1 Slack_導入数":26,"L1 AI and Data_導入数":1,"L1 Analytics_導入数":48,"L1 Integration_導入数":5},{"都道府県":"長野県","全企業数":4753,"SF導入企業数":171,"創業者フラグ企業数":378,"SF導入率(%)":3.6,"ホワイトスペース数":4582,"L1 Sales_導入数":73,"L1 Service_導入数":34,"L1 Slack_導入数":18,"L1 AI and Data_導入数":4,"L1 Analytics_導入数":36,"L1 Integration_導入数":2},{"都道府県":"山梨県","全企業数":2001,"SF導入企業数":71,"創業者フラグ企業数":154,"SF導入率(%)":3.55,"ホワイトスペース数":1930,"L1 Sales_導入数":19,"L1 Service_導入数":15,"L1 Slack_導入数":8,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":24,"L1 Integration_導入数":0},{"都道府県":"滋賀県","全企業数":2297,"SF導入企業数":80,"創業者フラグ企業数":150,"SF導入率(%)":3.48,"ホワイトスペース数":2217,"L1 Sales_導入数":31,"L1 Service_導入数":18,"L1 Slack_導入数":10,"L1 AI and Data_導入数":3,"L1 Analytics_導入数":22,"L1 Integration_導入数":0},{"都道府県":"新潟県","全企業数":4824,"SF導入企業数":166,"創業者フラグ企業数":333,"SF導入率(%)":3.44,"ホワイトスペース数":4658,"L1 Sales_導入数":62,"L1 Service_導入数":36,"L1 Slack_導入数":31,"L1 AI and Data_導入数":1,"L1 Analytics_導入数":46,"L1 Integration_導入数":1},{"都道府県":"香川県","全企業数":2405,"SF導入企業数":82,"創業者フラグ企業数":213,"SF導入率(%)":3.41,"ホワイトスペース数":2323,"L1 Sales_導入数":32,"L1 Service_導入数":16,"L1 Slack_導入数":16,"L1 AI and Data_導入数":1,"L1 Analytics_導入数":18,"L1 Integration_導入数":2},{"都道府県":"岐阜県","全企業数":3736,"SF導入企業数":126,"創業者フラグ企業数":273,"SF導入率(%)":3.37,"ホワイトスペース数":3610,"L1 Sales_導入数":62,"L1 Service_導入数":26,"L1 Slack_導入数":31,"L1 AI and Data_導入数":2,"L1 Analytics_導入数":36,"L1 Integration_導入数":0},{"都道府県":"長崎県","全企業数":2435,"SF導入企業数":78,"創業者フラグ企業数":160,"SF導入率(%)":3.2,"ホワイトスペース数":2357,"L1 Sales_導入数":28,"L1 Service_導入数":17,"L1 Slack_導入数":9,"L1 AI and Data_導入数":2,"L1 Analytics_導入数":22,"L1 Integration_導入数":0},{"都道府県":"愛媛県","全企業数":2998,"SF導入企業数":95,"創業者フラグ企業数":290,"SF導入率(%)":3.17,"ホワイトスペース数":2903,"L1 Sales_導入数":34,"L1 Service_導入数":10,"L1 Slack_導入数":16,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":21,"L1 Integration_導入数":0},{"都道府県":"三重県","全企業数":3721,"SF導入企業数":116,"創業者フラグ企業数":303,"SF導入率(%)":3.12,"ホワイトスペース数":3605,"L1 Sales_導入数":41,"L1 Service_導入数":17,"L1 Slack_導入数":16,"L1 AI and Data_導入数":2,"L1 Analytics_導入数":29,"L1 Integration_導入数":0},{"都道府県":"高知県","全企業数":1581,"SF導入企業数":49,"創業者フラグ企業数":103,"SF導入率(%)":3.1,"ホワイトスペース数":1532,"L1 Sales_導入数":12,"L1 Service_導入数":13,"L1 Slack_導入数":12,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":21,"L1 Integration_導入数":0},{"都道府県":"山形県","全企業数":2621,"SF導入企業数":78,"創業者フラグ企業数":180,"SF導入率(%)":2.98,"ホワイトスペース数":2543,"L1 Sales_導入数":36,"L1 Service_導入数":5,"L1 Slack_導入数":13,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":10,"L1 Integration_導入数":0},{"都道府県":"大分県","全企業数":2548,"SF導入企業数":76,"創業者フラグ企業数":267,"SF導入率(%)":2.98,"ホワイトスペース数":2472,"L1 Sales_導入数":22,"L1 Service_導入数":15,"L1 Slack_導入数":19,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":24,"L1 Integration_導入数":0},{"都道府県":"鳥取県","全企業数":1327,"SF導入企業数":39,"創業者フラグ企業数":106,"SF導入率(%)":2.94,"ホワイトスペース数":1288,"L1 Sales_導入数":15,"L1 Service_導入数":7,"L1 Slack_導入数":3,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":13,"L1 Integration_導入数":0},{"都道府県":"山口県","全企業数":2658,"SF導入企業数":76,"創業者フラグ企業数":176,"SF導入率(%)":2.86,"ホワイトスペース数":2582,"L1 Sales_導入数":31,"L1 Service_導入数":13,"L1 Slack_導入数":14,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":20,"L1 Integration_導入数":1},{"都道府県":"群馬県","全企業数":4156,"SF導入企業数":118,"創業者フラグ企業数":379,"SF導入率(%)":2.84,"ホワイトスペース数":4038,"L1 Sales_導入数":41,"L1 Service_導入数":21,"L1 Slack_導入数":20,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":28,"L1 Integration_導入数":0},{"都道府県":"栃木県","全企業数":3699,"SF導入企業数":105,"創業者フラグ企業数":323,"SF導入率(%)":2.84,"ホワイトスペース数":3594,"L1 Sales_導入数":37,"L1 Service_導入数":20,"L1 Slack_導入数":19,"L1 AI and Data_導入数":1,"L1 Analytics_導入数":24,"L1 Integration_導入数":0},{"都道府県":"福井県","全企業数":2242,"SF導入企業数":62,"創業者フラグ企業数":94,"SF導入率(%)":2.77,"ホワイトスペース数":2180,"L1 Sales_導入数":18,"L1 Service_導入数":16,"L1 Slack_導入数":15,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":18,"L1 Integration_導入数":0},{"都道府県":"北海道","全企業数":14098,"SF導入企業数":381,"創業者フラグ企業数":1587,"SF導入率(%)":2.7,"ホワイトスペース数":13717,"L1 Sales_導入数":137,"L1 Service_導入数":66,"L1 Slack_導入数":98,"L1 AI and Data_導入数":6,"L1 Analytics_導入数":92,"L1 Integration_導入数":3},{"都道府県":"島根県","全企業数":1565,"SF導入企業数":41,"創業者フラグ企業数":93,"SF導入率(%)":2.62,"ホワイトスペース数":1524,"L1 Sales_導入数":13,"L1 Service_導入数":6,"L1 Slack_導入数":3,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":8,"L1 Integration_導入数":0},{"都道府県":"和歌山県","全企業数":1984,"SF導入企業数":47,"創業者フラグ企業数":131,"SF導入率(%)":2.37,"ホワイトスペース数":1937,"L1 Sales_導入数":20,"L1 Service_導入数":12,"L1 Slack_導入数":6,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":12,"L1 Integration_導入数":0},{"都道府県":"福島県","全企業数":3875,"SF導入企業数":92,"創業者フラグ企業数":421,"SF導入率(%)":2.37,"ホワイトスペース数":3783,"L1 Sales_導入数":25,"L1 Service_導入数":14,"L1 Slack_導入数":13,"L1 AI and Data_導入数":1,"L1 Analytics_導入数":14,"L1 Integration_導入数":0},{"都道府県":"奈良県","全企業数":1999,"SF導入企業数":45,"創業者フラグ企業数":160,"SF導入率(%)":2.25,"ホワイトスペース数":1954,"L1 Sales_導入数":21,"L1 Service_導入数":10,"L1 Slack_導入数":6,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":12,"L1 Integration_導入数":0},{"都道府県":"徳島県","全企業数":1789,"SF導入企業数":40,"創業者フラグ企業数":115,"SF導入率(%)":2.24,"ホワイトスペース数":1749,"L1 Sales_導入数":9,"L1 Service_導入数":4,"L1 Slack_導入数":8,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":8,"L1 Integration_導入数":0},{"都道府県":"茨城県","全企業数":5051,"SF導入企業数":106,"創業者フラグ企業数":433,"SF導入率(%)":2.1,"ホワイトスペース数":4945,"L1 Sales_導入数":37,"L1 Service_導入数":16,"L1 Slack_導入数":20,"L1 AI and Data_導入数":1,"L1 Analytics_導入数":23,"L1 Integration_導入数":0},{"都道府県":"岩手県","全企業数":2538,"SF導入企業数":51,"創業者フラグ企業数":235,"SF導入率(%)":2.01,"ホワイトスペース数":2487,"L1 Sales_導入数":22,"L1 Service_導入数":8,"L1 Slack_導入数":14,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":9,"L1 Integration_導入数":0},{"都道府県":"青森県","全企業数":3078,"SF導入企業数":57,"創業者フラグ企業数":304,"SF導入率(%)":1.85,"ホワイトスペース数":3021,"L1 Sales_導入数":15,"L1 Service_導入数":8,"L1 Slack_導入数":10,"L1 AI and Data_導入数":0,"L1 Analytics_導入数":8,"L1 Integration_導入数":0},{"都道府県":"宮崎県","全企業数":2498,"SF導入企業数":42,"創業者フラグ企業数":200,"SF導入率(%)":1.68,"ホワイトスペース数":2456,"L1 Sales_導入数":13,"L1 Service_導入数":5,"L1 Slack_導入数":3,"L1 AI and Data_導入数":2,"L1 Analytics_導入数":8,"L1 Integration_導入数":0},{"都道府県":"秋田県","全企業数":2257,"SF導入企業数":35,"創業者フラグ企業数":165,"SF導入率(%)":1.55,"ホワイトスペース数":2222,"L1 Sales_導入数":7,"L1 Service_導入数":7,"L1 Slack_導入数":7,"L1 AI and Data_導入数":2,"L1 Analytics_導入数":8,"L1 Integration_導入数":0}];
+
+// ============================================================
+// CONFIG
+// ============================================================
+const PRODUCTS = ["L1 Sales","L1 Service","L1 Slack","L1 AI and Data","L1 Analytics","L1 Integration"];
+const PRODUCT_COLORS = {
+  "L1 Sales":"#0176d3","L1 Service":"#2ecc71","L1 Slack":"#7c5cbf",
+  "L1 AI and Data":"#ff6b35","L1 Analytics":"#f1c40f","L1 Integration":"#e74c3c"
+};
+const PRODUCT_LABELS = {
+  "L1 Sales":"Sales","L1 Service":"Service","L1 Slack":"Slack",
+  "L1 AI and Data":"AI & Data","L1 Analytics":"Analytics","L1 Integration":"Integration"
+};
+const REGIONS = {
+  "北海道・東北": ["北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県"],
+  "関東":         ["茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県"],
+  "中部":         ["新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県","静岡県","愛知県"],
+  "近畿":         ["三重県","滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県"],
+  "中国":         ["鳥取県","島根県","岡山県","広島県","山口県"],
+  "四国":         ["徳島県","香川県","愛媛県","高知県"],
+  "九州・沖縄":   ["福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"],
+};
+const REGION_COLORS = {
+  "北海道・東北":"#6c8ebf","関東":"#0176d3","中部":"#2ecc71",
+  "近畿":"#9b59b6","中国":"#f1c40f","四国":"#e67e22","九州・沖縄":"#e74c3c"
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let compareMode = false;
+
+// 通常フィルター
+let state = {
+  region: "ALL", pref: "ALL",
+  products: new Set(PRODUCTS), sort: "rate_desc",
+  aov: new Set(),      // 空=全て
+  founder: false,
+};
+
+// 比較フィルター A/B
+let stateA = { region:"ALL", pref:"ALL", products: new Set(PRODUCTS) };
+let stateB = { region:"関東", pref:"ALL", products: new Set(PRODUCTS) };
+
+function hexToRgb(hex){
+  const h=hex.replace('#','');
+  return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
+}
+
+// ============================================================
+// FILTER LOGIC
+// ============================================================
+function applyFilter(st, sourceData) {
+  let data = sourceData || prefData;
+  if (st.region !== "ALL") data = data.filter(d => REGIONS[st.region]?.includes(d['都道府県']));
+  if (st.pref   !== "ALL") data = data.filter(d => d['都道府県'] === st.pref);
+  return data;
+}
+
+function getFiltered() {
+  let data = applyFilter(state);
+  // 創業者フラグON時: 全企業数・SF数・WS数を創業者フラグ企業数ベースに切り替え
+  // (prefDataには創業者フラグ企業数が含まれているので、founderモードでは表示を差し替える)
+  data = [...data].sort((a,b)=>{
+    const sf=state.sort;
+    if(sf==='rate_desc') return b['SF導入率(%)']-a['SF導入率(%)'];
+    if(sf==='rate_asc')  return a['SF導入率(%)']-b['SF導入率(%)'];
+    if(sf==='sf_desc')   return b['SF導入企業数']-a['SF導入企業数'];
+    if(sf==='ws_desc')   return b['ホワイトスペース数']-a['ホワイトスペース数'];
+    if(sf==='total_desc')return b['全企業数']-a['全企業数'];
+    return 0;
+  });
+  return data;
+}
+
+function getProductCount(d, product) { return d[product + '_導入数'] || 0; }
+
+function stateLabel(st) {
+  if(st.pref !== 'ALL') return st.pref;
+  if(st.region !== 'ALL') return st.region;
+  return '全国';
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+let charts = {};
+function destroyChart(id) { if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+Chart.defaults.color = '#8892b0';
+Chart.defaults.borderColor = '#2e3350';
+Chart.defaults.font.family = "'Segoe UI','Hiragino Sans',sans-serif";
+
+// ============================================================
+// KPI RENDER
+// ============================================================
+function renderKPI(filtered) {
+  if(compareMode) {
+    const fA = applyFilter(stateA); const fB = applyFilter(stateB);
+    const tA=fA.reduce((s,d)=>s+d['全企業数'],0);       const tB=fB.reduce((s,d)=>s+d['全企業数'],0);
+    const sfA=fA.reduce((s,d)=>s+d['SF導入企業数'],0);  const sfB=fB.reduce((s,d)=>s+d['SF導入企業数'],0);
+    const wsA=fA.reduce((s,d)=>s+d['ホワイトスペース数'],0); const wsB=fB.reduce((s,d)=>s+d['ホワイトスペース数'],0);
+    const rA=tA>0?(sfA/tA*100).toFixed(2):0; const rB=tB>0?(sfB/tB*100).toFixed(2):0;
+
+    function cmpKpi(wrapId, aVal, bVal, fmt, diffLabel) {
+      const wrap = document.getElementById(wrapId);
+      wrap.innerHTML = `<div class="kpi-cmp">
+        <div class="kpi-cmp-row"><span class="kpi-cmp-val" style="color:var(--cmp-a)">${fmt(aVal)}</span><span class="kpi-cmp-tag a">A: ${stateLabel(stateA)}</span></div>
+        <div class="kpi-cmp-row"><span class="kpi-cmp-val" style="color:var(--cmp-b)">${fmt(bVal)}</span><span class="kpi-cmp-tag b">B: ${stateLabel(stateB)}</span></div>
+        <div class="kpi-cmp-diff">${diffLabel(aVal,bVal)}</div>
+      </div>`;
+    }
+    cmpKpi('kpi-total-wrap', tA, tB, v=>Number(v).toLocaleString(), (a,b)=>`差: ${Math.abs(a-b).toLocaleString()}社`);
+    cmpKpi('kpi-sf-wrap', sfA, sfB, v=>Number(v).toLocaleString(), (a,b)=>`差: ${Math.abs(a-b).toLocaleString()}社`);
+    cmpKpi('kpi-ws-wrap', wsA, wsB, v=>Number(v).toLocaleString(), (a,b)=>`差: ${Math.abs(a-b).toLocaleString()}社`);
+    cmpKpi('kpi-rate-wrap', rA, rB, v=>v+'%', (a,b)=>`差: ${Math.abs(Number(a)-Number(b)).toFixed(2)}pt`);
+    document.getElementById('headerBadge').textContent = '比較モード';
+  } else {
+    const totalComp = filtered.reduce((s,d)=>s+d['全企業数'],0);
+    const totalSF   = filtered.reduce((s,d)=>s+d['SF導入企業数'],0);
+    const totalWS   = filtered.reduce((s,d)=>s+d['ホワイトスペース数'],0);
+    const avgRate   = totalComp>0 ? (totalSF/totalComp*100).toFixed(2) : 0;
+    document.getElementById('kpi-total-wrap').innerHTML=`<div class="kpi-value" style="color:#0176d3" id="kpi-total">${totalComp.toLocaleString()}</div><div class="kpi-sub">対象フィルター内</div>`;
+    document.getElementById('kpi-sf-wrap').innerHTML=`<div class="kpi-value" style="color:#00a1e0" id="kpi-sf">${totalSF.toLocaleString()}</div><div class="kpi-sub" id="kpi-sf-sub">全体の ${avgRate}%</div>`;
+    document.getElementById('kpi-ws-wrap').innerHTML=`<div class="kpi-value" style="color:#ff6b35" id="kpi-ws">${totalWS.toLocaleString()}</div><div class="kpi-sub" id="kpi-ws-sub">SF未導入の潜在顧客</div>`;
+    document.getElementById('kpi-rate-wrap').innerHTML=`<div class="kpi-value" style="color:#7c5cbf" id="kpi-rate">${avgRate}%</div><div class="kpi-sub" id="kpi-rate-sub">${filtered.length}都道府県の平均</div>`;
+    document.getElementById('headerBadge').textContent = totalComp.toLocaleString() + '社分析';
+  }
+}
+
+// ============================================================
+// RENDER ALL CHARTS
+// ============================================================
+function renderAll() {
+  const filtered = getFiltered();
+
+  renderKPI(filtered);
+
+  const top20 = filtered.slice(0, 20);
+  const top15 = filtered.slice(0, 15);
+
+  const filterHint = state.region!=='ALL' ? `▸ ${state.region}` : state.pref!=='ALL' ? `▸ ${state.pref}` : '';
+  document.getElementById('prefRateHint').textContent = compareMode ? '' : filterHint;
+  document.getElementById('tableHint').textContent    = compareMode ? '' : filterHint;
+  document.getElementById('stackedHint').textContent  = compareMode ? '' : filterHint;
+  document.getElementById('countHint').textContent    = compareMode ? '' : filterHint;
+
+  // --- compare strip ---
+  const strip = document.getElementById('compareStrip');
+  if(compareMode){
+    strip.classList.add('visible');
+    document.getElementById('cstripA').textContent = 'A: ' + stateLabel(stateA);
+    document.getElementById('cstripB').textContent = 'B: ' + stateLabel(stateB);
+  } else {
+    strip.classList.remove('visible');
+  }
+
+  // ======= CHART 1: 都道府県別 SF導入率 =======
+  destroyChart('prefRate');
+  if(compareMode) {
+    const fA = applyFilter(stateA).sort((a,b)=>b['SF導入率(%)']-a['SF導入率(%)']).slice(0,15);
+    const fB = applyFilter(stateB).sort((a,b)=>b['SF導入率(%)']-a['SF導入率(%)']).slice(0,15);
+    // すべてのラベルをマージ (A優先)
+    const allPrefs = [...new Set([...fA.map(d=>d['都道府県']), ...fB.map(d=>d['都道府県'])])].slice(0,15);
+    const mapA = Object.fromEntries(fA.map(d=>[d['都道府県'],d['SF導入率(%)']]));
+    const mapB = Object.fromEntries(fB.map(d=>[d['都道府県'],d['SF導入率(%)']]));
+    charts['prefRate'] = new Chart(document.getElementById('prefRateChart'), {
+      type:'bar',
+      data:{
+        labels: allPrefs,
+        datasets:[
+          {label:`A: ${stateLabel(stateA)}`, data:allPrefs.map(p=>mapA[p]||0), backgroundColor:'rgba(0,161,224,0.8)', borderRadius:4, borderSkipped:false},
+          {label:`B: ${stateLabel(stateB)}`, data:allPrefs.map(p=>mapB[p]||0), backgroundColor:'rgba(255,107,53,0.75)', borderRadius:4, borderSkipped:false},
+        ]
+      },
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{padding:10,boxWidth:10}},
+          tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.raw}%`}}},
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v+'%'}},y:{grid:{display:false},ticks:{font:{size:11}}}}
+      }
+    });
+  } else {
+    charts['prefRate'] = new Chart(document.getElementById('prefRateChart'), {
+      type: 'bar',
+      data: {
+        labels: top20.map(d=>d['都道府県']),
+        datasets: [{
+          label: 'SF導入率(%)',
+          data: top20.map(d=>d['SF導入率(%)']),
+          backgroundColor: top20.map(d=>{
+            const r=d['SF導入率(%)'];
+            if(r>20) return 'rgba(1,118,211,0.92)';
+            if(r>8)  return 'rgba(0,161,224,0.85)';
+            if(r>5)  return 'rgba(46,204,113,0.8)';
+            return 'rgba(100,120,180,0.7)';
+          }),
+          borderRadius:6, borderSkipped:false,
+        }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>{
+            const d=top20[ctx.dataIndex];
+            return [` SF導入率: ${ctx.raw}%`,` SF企業数: ${d['SF導入企業数'].toLocaleString()}社`,` ホワイトスペース: ${d['ホワイトスペース数'].toLocaleString()}社`];
+          }}}},
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v+'%'}},y:{grid:{display:false},ticks:{font:{size:11}}}}
+      }
+    });
+  }
+
+  // ======= CHART 2: プロダクトカード + ドーナツ =======
+  const activeProd = [...state.products];
+  const productCardEl = document.getElementById('productCards');
+  productCardEl.innerHTML = '';
+  if(compareMode){
+    const fA = applyFilter(stateA); const fB = applyFilter(stateB);
+    const sfA = fA.reduce((s,d)=>s+d['SF導入企業数'],0);
+    const sfB = fB.reduce((s,d)=>s+d['SF導入企業数'],0);
+    PRODUCTS.forEach(p=>{
+      const cA=fA.reduce((s,d)=>s+getProductCount(d,p),0);
+      const cB=fB.reduce((s,d)=>s+getProductCount(d,p),0);
+      const card = document.createElement('div');
+      card.className='product-card'; card.style.setProperty('--p-color', PRODUCT_COLORS[p]);
+      card.innerHTML=`<div class="product-name">${PRODUCT_LABELS[p]}</div>
+        <div class="product-cmp-a" style="font-size:16px;font-weight:800;">${cA.toLocaleString()}</div>
+        <div class="product-card-cmp">
+          <span class="product-cmp-a">A ${sfA>0?(cA/sfA*100).toFixed(1):0}%</span>
+          <span style="margin:0 4px;color:var(--muted)">vs</span>
+          <span class="product-cmp-b">B ${sfB>0?(cB/sfB*100).toFixed(1):0}%</span>
+        </div>`;
+      productCardEl.appendChild(card);
+    });
+    // donut: compare A vs B per product (side by side via grouped bar instead)
+    destroyChart('donut');
+    charts['donut'] = new Chart(document.getElementById('productDonut'),{
+      type:'bar',
+      data:{
+        labels: PRODUCTS.map(p=>PRODUCT_LABELS[p]),
+        datasets:[
+          {label:`A: ${stateLabel(stateA)}`, data:PRODUCTS.map(p=>fA.reduce((s,d)=>s+getProductCount(d,p),0)), backgroundColor:'rgba(0,161,224,0.8)', borderRadius:4, borderSkipped:false},
+          {label:`B: ${stateLabel(stateB)}`, data:PRODUCTS.map(p=>fB.reduce((s,d)=>s+getProductCount(d,p),0)), backgroundColor:'rgba(255,107,53,0.75)', borderRadius:4, borderSkipped:false},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{padding:10,boxWidth:10}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}
+      }
+    });
+  } else {
+    const totalSF = filtered.reduce((s,d)=>s+d['SF導入企業数'],0);
+    activeProd.forEach(p=>{
+      const cnt = filtered.reduce((s,d)=>s+getProductCount(d,p),0);
+      const share = totalSF>0?(cnt/totalSF*100).toFixed(1):0;
+      const card = document.createElement('div');
+      card.className = 'product-card'; card.style.setProperty('--p-color', PRODUCT_COLORS[p]);
+      card.innerHTML=`<div class="product-name">${PRODUCT_LABELS[p]}</div><div class="product-count" style="color:${PRODUCT_COLORS[p]}">${cnt.toLocaleString()}</div><div class="product-share">SF企業内 ${share}%</div>`;
+      productCardEl.appendChild(card);
+    });
+    destroyChart('donut');
+    charts['donut'] = new Chart(document.getElementById('productDonut'),{
+      type:'doughnut',
+      data:{
+        labels: activeProd.map(p=>PRODUCT_LABELS[p]),
+        datasets:[{
+          data: activeProd.map(p=>filtered.reduce((s,d)=>s+getProductCount(d,p),0)),
+          backgroundColor: activeProd.map(p=>PRODUCT_COLORS[p]),
+          borderWidth:2, borderColor:'#1a1d27', hoverOffset:8,
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, cutout:'65%',
+        plugins:{
+          legend:{position:'right',labels:{padding:10,font:{size:10}}},
+          tooltip:{callbacks:{label:ctx=>{const totalSF2=filtered.reduce((s,d)=>s+d['SF導入企業数'],0); return ` ${ctx.label}: ${ctx.raw.toLocaleString()}社 (${totalSF2>0?(ctx.raw/totalSF2*100).toFixed(1):0}%)`;} }}
+        }
+      }
+    });
+  }
+
+  // ======= CHART 3: テーブル =======
+  const maxRate = filtered.length>0?filtered.reduce((m,d)=>Math.max(m,d['SF導入率(%)']),0):1;
+  document.getElementById('tableHead').innerHTML=`<tr>
+    <th>#</th><th>都道府県</th><th>導入率</th><th>SF企業数</th><th>全企業数</th><th>ホワイトスペース</th>
+    ${compareMode?'<th>A 導入率</th><th>B 導入率</th>':''}
+  </tr>`;
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML='';
+
+  if(compareMode) {
+    const fA = applyFilter(stateA); const fB = applyFilter(stateB);
+    const mapA2 = Object.fromEntries(fA.map(d=>[d['都道府県'],d]));
+    const mapB2 = Object.fromEntries(fB.map(d=>[d['都道府県'],d]));
+    const allPrefs2 = prefData.map(d=>d['都道府県']).filter(p=> mapA2[p]||mapB2[p]);
+    allPrefs2.forEach((pref,i)=>{
+      const dA=mapA2[pref]; const dB=mapB2[pref];
+      const dBase = dA||dB;
+      const barW = maxRate>0?Math.round(dBase['SF導入率(%)']/maxRate*100):0;
+      const rA = dA ? dA['SF導入率(%)']+'%' : '—';
+      const rB = dB ? dB['SF導入率(%)']+'%' : '—';
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class="rank">${i+1}</td><td class="pref-name">${pref}</td>
+        <td><div class="rate-bar-wrap"><div class="rate-bar" style="width:${barW}px"></div><span class="rate-val">${dBase['SF導入率(%)']}%</span></div></td>
+        <td>${dBase['SF導入企業数'].toLocaleString()}</td><td>${dBase['全企業数'].toLocaleString()}</td>
+        <td><span class="ws-badge">${dBase['ホワイトスペース数'].toLocaleString()}</span></td>
+        <td style="color:var(--cmp-a);font-weight:700">${rA}</td>
+        <td style="color:var(--cmp-b);font-weight:700">${rB}</td>`;
+      tbody.appendChild(tr);
+    });
+  } else {
+    filtered.forEach((d,i)=>{
+      const barW = maxRate>0?Math.round(d['SF導入率(%)']/maxRate*100):0;
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td class="rank">${i+1}</td><td class="pref-name">${d['都道府県']}</td>
+        <td><div class="rate-bar-wrap"><div class="rate-bar" style="width:${barW}px"></div><span class="rate-val">${d['SF導入率(%)']}%</span></div></td>
+        <td>${d['SF導入企業数'].toLocaleString()}</td><td>${d['全企業数'].toLocaleString()}</td>
+        <td><span class="ws-badge">${d['ホワイトスペース数'].toLocaleString()}</span></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ======= CHART 4: 積み上げ棒 SF vs WS =======
+  destroyChart('stacked');
+  if(compareMode){
+    const fA=applyFilter(stateA).sort((a,b)=>b['全企業数']-a['全企業数']).slice(0,10);
+    const fB=applyFilter(stateB).sort((a,b)=>b['全企業数']-a['全企業数']).slice(0,10);
+    const allP3=[...new Set([...fA.map(d=>d['都道府県']),...fB.map(d=>d['都道府県'])])].slice(0,10);
+    const mA3=Object.fromEntries(fA.map(d=>[d['都道府県'],d]));
+    const mB3=Object.fromEntries(fB.map(d=>[d['都道府県'],d]));
+    charts['stacked']=new Chart(document.getElementById('stackedBar'),{
+      type:'bar',
+      data:{
+        labels:allP3,
+        datasets:[
+          {label:`A SF導入`,data:allP3.map(p=>mA3[p]?mA3[p]['SF導入企業数']:0),backgroundColor:'rgba(0,161,224,0.85)',borderRadius:0},
+          {label:`A WS`,data:allP3.map(p=>mA3[p]?mA3[p]['ホワイトスペース数']:0),backgroundColor:'rgba(0,161,224,0.25)',borderRadius:0},
+          {label:`B SF導入`,data:allP3.map(p=>mB3[p]?mB3[p]['SF導入企業数']:0),backgroundColor:'rgba(255,107,53,0.85)',borderRadius:0},
+          {label:`B WS`,data:allP3.map(p=>mB3[p]?mB3[p]['ホワイトスペース数']:0),backgroundColor:'rgba(255,107,53,0.25)',borderRadius:0},
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{padding:10,boxWidth:10}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}
+      }
+    });
+  } else {
+    charts['stacked']=new Chart(document.getElementById('stackedBar'),{
+      type:'bar',
+      data:{
+        labels:top15.map(d=>d['都道府県']),
+        datasets:[
+          {label:'SF導入企業',data:top15.map(d=>d['SF導入企業数']),backgroundColor:'rgba(0,161,224,0.85)',borderRadius:0},
+          {label:'ホワイトスペース',data:top15.map(d=>d['ホワイトスペース数']),backgroundColor:'rgba(255,107,53,0.35)',borderRadius:0},
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{padding:14,boxWidth:10}},
+          tooltip:{mode:'index',callbacks:{afterBody:items=>{const d=top15[items[0].dataIndex];return [`導入率: ${d['SF導入率(%)']}%`];}}}},
+        scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}
+      }
+    });
+  }
+
+  // ======= CHART 5: プロダクト別 SF企業数 =======
+  destroyChart('sfCount');
+  if(compareMode){
+    const fA=applyFilter(stateA).sort((a,b)=>b['SF導入企業数']-a['SF導入企業数']).slice(0,10);
+    const fB=applyFilter(stateB).sort((a,b)=>b['SF導入企業数']-a['SF導入企業数']).slice(0,10);
+    const allP5=[...new Set([...fA.map(d=>d['都道府県']),...fB.map(d=>d['都道府県'])])].slice(0,10);
+    const mA5=Object.fromEntries(fA.map(d=>[d['都道府県'],d]));
+    const mB5=Object.fromEntries(fB.map(d=>[d['都道府県'],d]));
+    charts['sfCount']=new Chart(document.getElementById('sfCountChart'),{
+      type:'bar',
+      data:{
+        labels:allP5,
+        datasets:[
+          {label:`A: ${stateLabel(stateA)} SF数`,data:allP5.map(p=>mA5[p]?mA5[p]['SF導入企業数']:0),backgroundColor:'rgba(0,161,224,0.85)',borderRadius:4,borderSkipped:false},
+          {label:`B: ${stateLabel(stateB)} SF数`,data:allP5.map(p=>mB5[p]?mB5[p]['SF導入企業数']:0),backgroundColor:'rgba(255,107,53,0.75)',borderRadius:4,borderSkipped:false},
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{padding:10,boxWidth:10}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}
+      }
+    });
+  } else {
+    charts['sfCount']=new Chart(document.getElementById('sfCountChart'),{
+      type:'bar',
+      data:{
+        labels:top15.map(d=>d['都道府県']),
+        datasets:activeProd.map(p=>{
+          const [r,g,b]=hexToRgb(PRODUCT_COLORS[p]);
+          return {label:PRODUCT_LABELS[p],data:top15.map(d=>getProductCount(d,p)),backgroundColor:`rgba(${r},${g},${b},0.82)`,borderRadius:0};
+        })
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom',labels:{padding:8,boxWidth:10,font:{size:10}}}},
+        scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}
+      }
+    });
+  }
+
+  // ======= CHART 6: 散布図 =======
+  destroyChart('scatter');
+  if(compareMode){
+    const fA=applyFilter(stateA); const fB=applyFilter(stateB);
+    charts['scatter']=new Chart(document.getElementById('scatterChart'),{
+      type:'scatter',
+      data:{datasets:[
+        {label:`A: ${stateLabel(stateA)}`,
+          data:fA.map(d=>({x:d['SF導入率(%)'],y:d['ホワイトスペース数'],pref:d['都道府県'],sfCount:d['SF導入企業数']})),
+          backgroundColor:'rgba(0,161,224,0.75)',
+          pointRadius:fA.map(d=>Math.max(5,Math.min(22,d['SF導入企業数']/200))), pointHoverRadius:10},
+        {label:`B: ${stateLabel(stateB)}`,
+          data:fB.map(d=>({x:d['SF導入率(%)'],y:d['ホワイトスペース数'],pref:d['都道府県'],sfCount:d['SF導入企業数']})),
+          backgroundColor:'rgba(255,107,53,0.75)',
+          pointRadius:fB.map(d=>Math.max(5,Math.min(22,d['SF導入企業数']/200))), pointHoverRadius:10},
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{padding:10,boxWidth:10}},
+          tooltip:{callbacks:{label:ctx=>{const d=ctx.raw;return [` ${d.pref}`,` SF導入率: ${d.x}%`,` ホワイトスペース: ${d.y.toLocaleString()}社`];}}}},
+        scales:{x:{title:{display:true,text:'SF導入率(%)'},grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v+'%'}},y:{title:{display:true,text:'ホワイトスペース数（社）'},grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}
+      }
+    });
+  } else {
+    charts['scatter']=new Chart(document.getElementById('scatterChart'),{
+      type:'scatter',
+      data:{datasets:[{
+        label:'都道府県',
+        data:filtered.map(d=>({x:d['SF導入率(%)'],y:d['ホワイトスペース数'],pref:d['都道府県'],sfCount:d['SF導入企業数']})),
+        backgroundColor:filtered.map(d=>{const r=d['SF導入率(%)'];if(r>20)return 'rgba(1,118,211,0.88)';if(r>8)return 'rgba(0,161,224,0.82)';if(r>4)return 'rgba(46,204,113,0.78)';return 'rgba(124,92,191,0.72)';}),
+        pointRadius:filtered.map(d=>Math.max(5,Math.min(22,d['SF導入企業数']/200))), pointHoverRadius:10,
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>{const d=ctx.raw;return [` ${d.pref}`,` SF導入率: ${d.x}%`,` ホワイトスペース: ${d.y.toLocaleString()}社`,` SF企業数: ${d.sfCount.toLocaleString()}社`];}}}},
+        scales:{x:{title:{display:true,text:'SF導入率(%)'},grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v+'%'}},y:{title:{display:true,text:'ホワイトスペース数（社）'},grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}}
+      }
+    });
+  }
+
+  // company list re-filter
+  if(companiesLoaded) renderCompanyList();
+}
+
+// ============================================================
+// BUILD NORMAL FILTER UI
+// ============================================================
+const regionChips = document.getElementById('regionChips');
+['ALL',...Object.keys(REGIONS)].forEach(r=>{
+  const chip=document.createElement('button');
+  chip.className='chip'+(r==='ALL'?' active':'');
+  chip.textContent=r==='ALL'?'全国':r;
+  if(r!=='ALL') chip.style.cssText=`--rc:${REGION_COLORS[r]}`;
+  chip.dataset.region=r;
+  chip.addEventListener('click',()=>{
+    state.region=r; state.pref='ALL';
+    document.getElementById('prefSelect').value='ALL';
+    updatePrefOptions();
+    regionChips.querySelectorAll('.chip').forEach(c=>{c.classList.remove('active');c.style.background='';c.style.borderColor='';c.style.color='';});
+    chip.classList.add('active');
+    if(r!=='ALL'){const[rv,gv,bv]=hexToRgb(REGION_COLORS[r]);chip.style.background=`rgba(${rv},${gv},${bv},0.85)`;chip.style.borderColor='transparent';chip.style.color='#fff';}
+    renderAll();
+  });
+  regionChips.appendChild(chip);
+});
+
+const prefSelect=document.getElementById('prefSelect');
+function updatePrefOptions(){
+  prefSelect.innerHTML='<option value="ALL">全都道府県</option>';
+  const list=state.region==='ALL'?prefData.map(d=>d['都道府県']):(REGIONS[state.region]||[]);
+  list.forEach(p=>{const opt=document.createElement('option');opt.value=p;opt.textContent=p;prefSelect.appendChild(opt);});
+  prefSelect.value='ALL';
+}
+updatePrefOptions();
+prefSelect.addEventListener('change',()=>{state.pref=prefSelect.value;renderAll();});
+
+const productChips=document.getElementById('productChips');
+PRODUCTS.forEach(p=>{
+  const chip=document.createElement('button');
+  chip.className='chip active';
+  chip.textContent=PRODUCT_LABELS[p];
+  const[r,g,b]=hexToRgb(PRODUCT_COLORS[p]);
+  chip.style.background=`rgba(${r},${g},${b},0.8)`;chip.style.borderColor='transparent';chip.style.color='#fff';
+  chip.dataset.product=p;
+  chip.addEventListener('click',()=>{
+    if(state.products.has(p)){if(state.products.size===1)return;state.products.delete(p);chip.classList.remove('active');chip.style.background='';chip.style.borderColor='';chip.style.color='';}
+    else{state.products.add(p);chip.classList.add('active');chip.style.background=`rgba(${r},${g},${b},0.8)`;chip.style.borderColor='transparent';chip.style.color='#fff';}
+    renderAll();
+  });
+  productChips.appendChild(chip);
+});
+
+document.getElementById('sortSelect').addEventListener('change',e=>{state.sort=e.target.value;renderAll();});
+
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  state={region:'ALL',pref:'ALL',products:new Set(PRODUCTS),sort:'rate_desc',aov:new Set(),founder:false};
+  regionChips.querySelectorAll('.chip').forEach((c,i)=>{c.classList.toggle('active',i===0);c.style.background='';c.style.borderColor='';c.style.color='';});
+  productChips.querySelectorAll('.chip').forEach((c,i)=>{
+    const p=PRODUCTS[i];const[r,g,b]=hexToRgb(PRODUCT_COLORS[p]);
+    c.classList.add('active');c.style.background=`rgba(${r},${g},${b},0.8)`;c.style.borderColor='transparent';c.style.color='#fff';
+  });
+  // AOV・創業者チップリセット
+  document.querySelectorAll('#globalAovChips .chip').forEach(c=>{c.classList.remove('active');c.style.background='';c.style.borderColor='';c.style.color='';});
+  const gfc=document.getElementById('globalFounderChip');
+  gfc.classList.remove('active');gfc.style.background='';gfc.style.borderColor='';gfc.style.color='';
+  // 企業一覧側も連動リセット
+  cState.founder=false; cState.aov=new Set();
+  const ft=document.getElementById('founderToggle'); if(ft){ft.classList.remove('active');}
+  document.querySelectorAll('#aovChips .aov-chip').forEach(c=>c.classList.remove('active'));
+  updatePrefOptions();document.getElementById('sortSelect').value='rate_desc';
+  renderAll();
+});
+
+// ============================================================
+// BUILD COMPARE FILTER UI (A and B)
+// ============================================================
+function buildCmpFilterUI(containerId, prefSelectId, stateRef, label) {
+  const rc = document.getElementById(containerId);
+  const allRegions = ['ALL',...Object.keys(REGIONS)];
+  allRegions.forEach(r=>{
+    const chip=document.createElement('button');
+    chip.className='chip'+(stateRef.region===r?' active':'');
+    chip.textContent=r==='ALL'?'全国':r;
+    chip.dataset.region=r;
+    if(r!=='ALL'&&stateRef.region===r){const[rv,gv,bv]=hexToRgb(REGION_COLORS[r]);chip.style.background=`rgba(${rv},${gv},${bv},0.85)`;chip.style.borderColor='transparent';chip.style.color='#fff';}
+    chip.addEventListener('click',()=>{
+      stateRef.region=r; stateRef.pref='ALL';
+      updateCmpPrefOptions(prefSelectId, stateRef);
+      rc.querySelectorAll('.chip').forEach(c=>{c.classList.remove('active');c.style.background='';c.style.borderColor='';c.style.color='';});
+      chip.classList.add('active');
+      if(r!=='ALL'){const[rv,gv,bv]=hexToRgb(REGION_COLORS[r]);chip.style.background=`rgba(${rv},${gv},${bv},0.85)`;chip.style.borderColor='transparent';chip.style.color='#fff';}
+      renderAll();
+    });
+    rc.appendChild(chip);
+  });
+
+  // pref select
+  const ps=document.getElementById(prefSelectId);
+  updateCmpPrefOptions(prefSelectId, stateRef);
+  ps.addEventListener('change',()=>{stateRef.pref=ps.value;renderAll();});
+}
+
+function updateCmpPrefOptions(selectId, stateRef){
+  const ps=document.getElementById(selectId);
+  ps.innerHTML='<option value="ALL">全都道府県</option>';
+  const list=stateRef.region==='ALL'?prefData.map(d=>d['都道府県']):(REGIONS[stateRef.region]||[]);
+  list.forEach(p=>{const opt=document.createElement('option');opt.value=p;opt.textContent=p;ps.appendChild(opt);});
+  ps.value=stateRef.pref||'ALL';
+}
+
+// compare product chips A
+function buildCmpProductChips(containerId, stateRef){
+  const pc=document.getElementById(containerId);
+  PRODUCTS.forEach(p=>{
+    const chip=document.createElement('button');
+    chip.className='chip active';
+    chip.textContent=PRODUCT_LABELS[p];
+    const[r,g,b]=hexToRgb(PRODUCT_COLORS[p]);
+    chip.style.background=`rgba(${r},${g},${b},0.8)`;chip.style.borderColor='transparent';chip.style.color='#fff';
+    chip.addEventListener('click',()=>{
+      if(stateRef.products.has(p)){if(stateRef.products.size===1)return;stateRef.products.delete(p);chip.classList.remove('active');chip.style.background='';chip.style.borderColor='';chip.style.color='';}
+      else{stateRef.products.add(p);chip.classList.add('active');chip.style.background=`rgba(${r},${g},${b},0.8)`;chip.style.borderColor='transparent';chip.style.color='#fff';}
+      renderAll();
+    });
+    pc.appendChild(chip);
+  });
+}
+
+buildCmpFilterUI('cmpRegionChipsA','cmpPrefSelectA',stateA,'A');
+buildCmpFilterUI('cmpRegionChipsB','cmpPrefSelectB',stateB,'B');
+buildCmpProductChips('cmpProductChipsA',stateA);
+buildCmpProductChips('cmpProductChipsB',stateB);
+
+// ============================================================
+// COMPARE MODE TOGGLE
+// ============================================================
+const cmpToggleBtn = document.getElementById('cmpToggleBtn');
+const normalFilterBar = document.getElementById('normalFilterBar');
+const cmpFilterBar = document.getElementById('cmpFilterBar');
+
+cmpToggleBtn.addEventListener('click',()=>{
+  compareMode = !compareMode;
+  cmpToggleBtn.classList.toggle('active', compareMode);
+  normalFilterBar.style.display = compareMode ? 'none' : '';
+  cmpFilterBar.classList.toggle('visible', compareMode);
+  renderAll();
+  if(companiesLoaded) renderCompanyList();
+});
+
+// ============================================================
+// COMPANY LIST
+// ============================================================
+let allCompanies = [];
+let companiesLoaded = false;
+
+// company list state
+let cState = {
+  search: '',
+  sfFilter: 'all',   // all / sf / ws
+  founder: false,     // 創業者フラグ
+  aov: new Set(),     // 選択中AOVバンド（空=全て）
+  salesMin: 0,
+  salesMax: 999999999999,
+  empMin: 0,
+  empMax: 9999999,
+  scoreMin: 0,
+  sort: 'sales_desc',
+  page: 1,
+  perPage: 50,
+};
+
+// AOV Band の定義順
+const AOV_BANDS = ['$1-10k','$10k-50k','$50k-100k','$100k-200k','$200k-600k','$600k-1M','$1M-5M','$5M+'];
+
+const PAGE_RANGE = 5;
+
+function getCompanyFiltered() {
+  let data = allCompanies;
+
+  // region/pref filter (sync with main state or compare A)
+  const activeState = compareMode ? stateA : state;
+  if(activeState.region !== 'ALL'){
+    const prefs = REGIONS[activeState.region] || [];
+    data = data.filter(c => prefs.includes(c.pref));
+  }
+  if(activeState.pref !== 'ALL') data = data.filter(c => c.pref === activeState.pref);
+
+  // sf filter
+  if(cState.sfFilter === 'sf') data = data.filter(c => c.sf === '1');
+  else if(cState.sfFilter === 'ws') data = data.filter(c => c.sf !== '1');
+
+  // 創業者フラグ（上部 or 下部どちらかがONなら適用）
+  if(cState.founder || state.founder) data = data.filter(c => c.founder === '1');
+
+  // AOV Band（上部・下部の選択をマージ：選択がある方を使う、両方あればOR）
+  const mergedAov = new Set([...cState.aov, ...state.aov]);
+  if(mergedAov.size > 0) data = data.filter(c => mergedAov.has(c.aov));
+
+  // 売上高レンジ（千円単位で保持）
+  if(cState.salesMin > 0)          data = data.filter(c => (c.sales_num||0) >= cState.salesMin);
+  if(cState.salesMax < 999999999999) data = data.filter(c => (c.sales_num||0) <  cState.salesMax);
+
+  // 従業員数レンジ
+  if(cState.empMin > 0)           data = data.filter(c => (c.employees_num||0) >= cState.empMin);
+  if(cState.empMax < 9999999)     data = data.filter(c => (c.employees_num||0) <= cState.empMax);
+
+  // 評点下限
+  if(cState.scoreMin > 0) data = data.filter(c => (c.score_num||0) >= cState.scoreMin);
+
+  // search
+  if(cState.search) {
+    const q = cState.search.toLowerCase();
+    data = data.filter(c => (c.name||'').toLowerCase().includes(q) || (c.industry||'').toLowerCase().includes(q) || (c.pref||'').includes(q));
+  }
+
+  // sort
+  data = [...data].sort((a,b)=>{
+    if(cState.sort==='sales_desc') return (b.sales_num||0)-(a.sales_num||0);
+    if(cState.sort==='sales_asc')  return (a.sales_num||0)-(b.sales_num||0);
+    if(cState.sort==='emp_desc')   return (b.employees_num||0)-(a.employees_num||0);
+    if(cState.sort==='score_desc') return (b.score_num||0)-(a.score_num||0);
+    if(cState.sort==='rate_desc')  return (b.sf==='1'?1:0)-(a.sf==='1'?1:0);
+    return 0;
+  });
+
+  return data;
+}
+
+function formatSales(val) {
+  // sales_num の単位は千円
+  if(!val) return '—';
+  const n = Number(val);
+  if(isNaN(n)||n===0) return '—';
+  if(n >= 1000000000) return (n/1000000000).toFixed(1) + '兆円';  // ≥1兆円
+  if(n >= 100000)     return (n/100000).toFixed(0) + '億円';       // ≥1億円
+  if(n >= 100)        return (n/100).toFixed(1) + '千万円';        // ≥1千万円
+  return (n*1000).toLocaleString() + '円';
+}
+
+function getProdTags(c) {
+  const map = [
+    ['p_sales','Sales','#0176d3'],['p_service','Service','#2ecc71'],['p_slack','Slack','#7c5cbf'],
+    ['p_ai','AI&Data','#ff6b35'],['p_analytics','Analytics','#f1c40f'],['p_integration','Integ.','#e74c3c']
+  ];
+  return map.filter(([k])=>c[k]==='1').map(([,label,color])=>`<span class="prod-tag" style="background:${color}22;color:${color};border:1px solid ${color}44">${label}</span>`).join('');
+}
+
+function renderCompanyList() {
+  const filtered = getCompanyFiltered();
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / cState.perPage));
+  if(cState.page > totalPages) cState.page = totalPages;
+  const start = (cState.page-1)*cState.perPage;
+  const page = filtered.slice(start, start+cState.perPage);
+
+  document.getElementById('companyCount').textContent = `${total.toLocaleString()}社 / 全${allCompanies.length.toLocaleString()}社`;
+
+  const wrap = document.getElementById('companyTableWrap');
+
+  if(page.length === 0){
+    wrap.innerHTML = `<div class="loading-msg" style="padding:30px">該当する企業がありません</div>`;
+    document.getElementById('companyPagination').innerHTML='';
+    return;
+  }
+
+  let html = `<table class="company-table">
+    <thead><tr>
+      <th>会社名</th>
+      <th>都道府県</th>
+      <th>業種</th>
+      <th>売上高</th>
+      <th>従業員数</th>
+      <th>評点</th>
+      <th>SF</th>
+      <th>創業者</th>
+      <th>導入プロダクト</th>
+      <th>AOV Band</th>
+    </tr></thead><tbody>`;
+
+  page.forEach(c=>{
+    const scoreW = c.score_num ? Math.round(c.score_num/100*60) : 0;
+    const sfBadge = c.sf==='1'
+      ? `<span class="sf-badge yes">導入済</span>`
+      : `<span class="sf-badge no">WS</span>`;
+    html += `<tr>
+      <td><div class="company-name" title="${c.name||''}">${c.name||'—'}</div></td>
+      <td><span class="company-pref">${c.pref||'—'}</span></td>
+      <td><div class="company-industry" title="${c.industry||''}">${c.industry||'—'}</div></td>
+      <td style="white-space:nowrap;font-size:11px">${formatSales(c.sales)}</td>
+      <td style="font-size:12px">${c.employees_num ? Number(c.employees_num).toLocaleString()+'名' : '—'}</td>
+      <td>
+        <div class="score-bar-wrap">
+          <div class="score-bar" style="width:${scoreW}px;background:${c.score_num>60?'#2ecc71':c.score_num>40?'#f1c40f':'#e74c3c'}"></div>
+          <span style="font-size:11px;font-weight:700">${c.score||'—'}</span>
+        </div>
+      </td>
+      <td>${sfBadge}</td>
+      <td style="text-align:center">${c.founder==='1' ? '<span style="color:#f1c40f;font-size:13px" title="創業者フラグ">🌱</span>' : '<span style="color:var(--border)">—</span>'}</td>
+      <td><div class="products-cell">${getProdTags(c)}</div></td>
+      <td style="font-size:11px;color:var(--muted)">${c.aov||'—'}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+
+  // pagination
+  const pag = document.getElementById('companyPagination');
+  pag.innerHTML = '';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.className='page-btn'; prevBtn.textContent='←'; prevBtn.disabled=cState.page<=1;
+  prevBtn.addEventListener('click',()=>{if(cState.page>1){cState.page--;renderCompanyList();document.querySelector('.company-section').scrollIntoView({behavior:'smooth'});}});
+  pag.appendChild(prevBtn);
+
+  const startPage = Math.max(1, cState.page - Math.floor(PAGE_RANGE/2));
+  const endPage   = Math.min(totalPages, startPage + PAGE_RANGE - 1);
+  if(startPage>1){ const b=document.createElement('button');b.className='page-btn';b.textContent='1';b.addEventListener('click',()=>{cState.page=1;renderCompanyList();});pag.appendChild(b); if(startPage>2){const e=document.createElement('span');e.className='page-info';e.textContent='...';pag.appendChild(e);} }
+  for(let i=startPage;i<=endPage;i++){
+    const b=document.createElement('button'); b.className='page-btn'+(i===cState.page?' active':''); b.textContent=i;
+    b.addEventListener('click',()=>{cState.page=i;renderCompanyList();document.querySelector('.company-section').scrollIntoView({behavior:'smooth'});});
+    pag.appendChild(b);
+  }
+  if(endPage<totalPages){ if(endPage<totalPages-1){const e=document.createElement('span');e.className='page-info';e.textContent='...';pag.appendChild(e);} const b=document.createElement('button');b.className='page-btn';b.textContent=totalPages;b.addEventListener('click',()=>{cState.page=totalPages;renderCompanyList();});pag.appendChild(b); }
+
+  const nextBtn=document.createElement('button');
+  nextBtn.className='page-btn'; nextBtn.textContent='→'; nextBtn.disabled=cState.page>=totalPages;
+  nextBtn.addEventListener('click',()=>{if(cState.page<totalPages){cState.page++;renderCompanyList();document.querySelector('.company-section').scrollIntoView({behavior:'smooth'});}});
+  pag.appendChild(nextBtn);
+
+  const info=document.createElement('span');
+  info.className='page-info'; info.textContent=`${start+1}–${Math.min(start+cState.perPage,total)} / ${total.toLocaleString()}社`;
+  pag.appendChild(info);
+}
+
+// ============================================================
+// GLOBAL FILTER BAR: AOV & 創業者チップ
+// ============================================================
+
+// グローバルAOVチップ（上部フィルターバー）
+const globalAovContainer = document.getElementById('globalAovChips');
+AOV_BANDS.forEach(band=>{
+  const chip = document.createElement('button');
+  chip.className = 'chip';
+  chip.textContent = band;
+  chip.dataset.aov = band;
+  chip.addEventListener('click',()=>{
+    if(state.aov.has(band)){
+      state.aov.delete(band);
+      chip.classList.remove('active');
+      chip.style.background=''; chip.style.borderColor=''; chip.style.color='';
+    } else {
+      state.aov.add(band);
+      chip.classList.add('active');
+      chip.style.background='rgba(124,92,191,0.8)';chip.style.borderColor='transparent';chip.style.color='#fff';
+    }
+    // 企業一覧側も同期
+    cState.aov = new Set(state.aov);
+    document.querySelectorAll('#aovChips .aov-chip').forEach(c=>{
+      const active = cState.aov.has(c.dataset.aov);
+      c.classList.toggle('active', active);
+    });
+    cState.page=1; renderAll();
+  });
+  globalAovContainer.appendChild(chip);
+});
+
+// グローバル創業者チップ（上部フィルターバー）
+const globalFounderChip = document.getElementById('globalFounderChip');
+globalFounderChip.addEventListener('click',()=>{
+  state.founder = !state.founder;
+  if(state.founder){
+    globalFounderChip.classList.add('active');
+    globalFounderChip.style.background='rgba(241,196,15,0.25)';
+    globalFounderChip.style.borderColor='#f1c40f';
+    globalFounderChip.style.color='#f1c40f';
+  } else {
+    globalFounderChip.classList.remove('active');
+    globalFounderChip.style.background='';
+    globalFounderChip.style.borderColor='';
+    globalFounderChip.style.color='';
+  }
+  // 企業一覧側も同期
+  cState.founder = state.founder;
+  const ft = document.getElementById('founderToggle');
+  if(ft) ft.classList.toggle('active', cState.founder);
+  cState.page=1; renderAll();
+});
+
+// ============================================================
+// COMPANY FILTER UI SETUP
+// ============================================================
+
+// AOV chips（companies.json読み込み後に動的生成 → ここは先にコンテナ設定のみ）
+function buildAovChips() {
+  const container = document.getElementById('aovChips');
+  container.innerHTML = '';
+  AOV_BANDS.forEach(band=>{
+    const btn = document.createElement('button');
+    btn.className = 'aov-chip';
+    btn.textContent = band;
+    btn.dataset.aov = band;
+    btn.addEventListener('click',()=>{
+      if(cState.aov.has(band)){
+        cState.aov.delete(band);
+        btn.classList.remove('active');
+      } else {
+        cState.aov.add(band);
+        btn.classList.add('active');
+      }
+      cState.page=1; renderCompanyList();
+    });
+    container.appendChild(btn);
+  });
+}
+buildAovChips();
+
+// toolbar events
+let searchTimer;
+document.getElementById('companySearch').addEventListener('input', e=>{
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(()=>{cState.search=e.target.value; cState.page=1; if(companiesLoaded)renderCompanyList();}, 250);
+});
+
+document.querySelectorAll('.seg-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    cState.sfFilter=btn.dataset.sf; cState.page=1; if(companiesLoaded)renderCompanyList();
+  });
+});
+
+// 創業者フラグ
+const founderToggle = document.getElementById('founderToggle');
+founderToggle.addEventListener('click',()=>{
+  cState.founder = !cState.founder;
+  founderToggle.classList.toggle('active', cState.founder);
+  cState.page=1; if(companiesLoaded)renderCompanyList();
+});
+
+// 売上高
+document.getElementById('salesMinSel').addEventListener('change',e=>{
+  cState.salesMin=Number(e.target.value); cState.page=1; if(companiesLoaded)renderCompanyList();
+});
+document.getElementById('salesMaxSel').addEventListener('change',e=>{
+  cState.salesMax=Number(e.target.value); cState.page=1; if(companiesLoaded)renderCompanyList();
+});
+
+// 従業員数
+document.getElementById('empMinSel').addEventListener('change',e=>{
+  cState.empMin=Number(e.target.value); cState.page=1; if(companiesLoaded)renderCompanyList();
+});
+document.getElementById('empMaxSel').addEventListener('change',e=>{
+  cState.empMax=Number(e.target.value); cState.page=1; if(companiesLoaded)renderCompanyList();
+});
+
+// 評点
+document.getElementById('scoreMinSel').addEventListener('change',e=>{
+  cState.scoreMin=Number(e.target.value); cState.page=1; if(companiesLoaded)renderCompanyList();
+});
+
+// ソート
+document.getElementById('companySortSel').addEventListener('change',e=>{
+  cState.sort=e.target.value; cState.page=1; if(companiesLoaded)renderCompanyList();
+});
+
+// フィルターリセット
+document.getElementById('companyFilterClear').addEventListener('click',()=>{
+  cState.search=''; cState.sfFilter='all'; cState.founder=false;
+  cState.aov=new Set(); cState.salesMin=0; cState.salesMax=999999999999;
+  cState.empMin=0; cState.empMax=9999999; cState.scoreMin=0; cState.page=1;
+  // UIリセット
+  document.getElementById('companySearch').value='';
+  document.querySelectorAll('.seg-btn').forEach((b,i)=>b.classList.toggle('active',i===0));
+  founderToggle.classList.remove('active');
+  document.querySelectorAll('.aov-chip').forEach(c=>c.classList.remove('active'));
+  document.getElementById('salesMinSel').value='0';
+  document.getElementById('salesMaxSel').value='999999999999';
+  document.getElementById('empMinSel').value='0';
+  document.getElementById('empMaxSel').value='9999999';
+  document.getElementById('scoreMinSel').value='0';
+  if(companiesLoaded)renderCompanyList();
+});
+
+// ============================================================
+// LOAD companies.json
+// ============================================================
+fetch('companies.json')
+  .then(r=>{ if(!r.ok) throw new Error('companies.json not found'); return r.json(); })
+  .then(data=>{
+    allCompanies = data;
+    companiesLoaded = true;
+    document.getElementById('companyHint').textContent = `${data.length.toLocaleString()}社`;
+    renderCompanyList();
+  })
+  .catch(err=>{
+    document.getElementById('companyTableWrap').innerHTML = `<div class="loading-msg">
+      ⚠️ companies.json の読み込みに失敗しました<br>
+      <span style="font-size:11px;color:var(--muted)">同じフォルダにcompanies.jsonが必要です。${err.message}</span>
+    </div>`;
+    document.getElementById('companyCount').textContent = '読み込み失敗';
+  });
+
+// ============================================================
+// INIT
+// ============================================================
+renderAll();
+</script>
+</body>
+</html>

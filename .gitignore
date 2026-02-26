@@ -1,0 +1,24 @@
+# 生データ（CSVs / Excels）
+*.csv
+*.xlsx
+*.xls
+*.pdf
+
+# 大容量JSONは Git LFS または Netlify Large Media で管理
+companies.json
+dist/companies.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# テキスト出力
+_data_export.txt
+centroids_output.txt

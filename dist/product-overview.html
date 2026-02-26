@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SF導入分析ダッシュボード — 製品概要</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue:   #0066FF;
+    --navy:   #0A1628;
+    --slate:  #1E2D45;
+    --sky:    #E8F1FF;
+    --green:  #00C48C;
+    --yellow: #F1C40F;
+    --text:   #1A1A2E;
+    --muted:  #6B7280;
+    --border: #E5E7EB;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    color: var(--text);
+    background: #F9FAFB;
+    line-height: 1.7;
+  }
+
+  /* HERO */
+  .hero {
+    background: linear-gradient(135deg, var(--navy) 0%, #1a3a6b 100%);
+    color: #fff;
+    padding: 80px 24px 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 70% 50%, rgba(0,102,255,.3) 0%, transparent 60%);
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(0,196,140,.2);
+    border: 1px solid rgba(0,196,140,.5);
+    color: #00C48C;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    padding: 4px 14px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .hero h1 span { color: #60A5FA; }
+  .hero p {
+    font-size: 18px;
+    color: rgba(255,255,255,.75);
+    max-width: 580px;
+    margin: 0 auto 36px;
+    position: relative;
+  }
+  .hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .hero-stat { text-align: center; }
+  .hero-stat .num {
+    font-size: 32px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+  }
+  .hero-stat .num span { color: #60A5FA; font-size: 20px; }
+  .hero-stat .label { font-size: 12px; color: rgba(255,255,255,.6); margin-top: 4px; }
+
+  /* SECTION */
+  section { padding: 64px 24px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    color: var(--blue);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-size: clamp(22px, 4vw, 32px);
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+  .section-sub {
+    color: var(--muted);
+    max-width: 560px;
+    margin-bottom: 40px;
+  }
+
+  /* WHAT */
+  .what-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  .what-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    transition: box-shadow .2s;
+  }
+  .what-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.08); }
+  .what-card .icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    margin-bottom: 16px;
+  }
+  .what-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .what-card p { font-size: 14px; color: var(--muted); }
+
+  /* DATA */
+  .data-section { background: var(--sky); }
+  .data-flow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .data-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px 28px;
+    text-align: center;
+    min-width: 180px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.06);
+  }
+  .data-box .tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--blue);
+    margin-bottom: 8px;
+  }
+  .data-box .name { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+  .data-box .desc { font-size: 12px; color: var(--muted); }
+  .data-arrow {
+    font-size: 24px;
+    color: var(--blue);
+    font-weight: 800;
+  }
+  .data-result {
+    background: var(--navy);
+    color: #fff;
+    border-radius: 14px;
+    padding: 24px 28px;
+    text-align: center;
+    min-width: 200px;
+  }
+  .data-result .tag { font-size: 11px; font-weight: 700; color: #60A5FA; margin-bottom: 8px; }
+  .data-result .name { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+  .data-result .desc { font-size: 12px; color: rgba(255,255,255,.6); }
+
+  /* FEATURES */
+  .feature-list { display: flex; flex-direction: column; gap: 20px; }
+  .feature-item {
+    display: flex;
+    gap: 20px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .feature-num {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    background: var(--navy);
+    color: #fff;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    font-weight: 800;
+  }
+  .feature-body h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .feature-body p { font-size: 14px; color: var(--muted); }
+  .feature-body .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .feature-body .tag {
+    font-size: 11px;
+    background: var(--sky);
+    color: var(--blue);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  /* USE CASES */
+  .use-section { background: var(--navy); color: #fff; }
+  .use-section .section-title { color: #fff; }
+  .use-section .section-sub { color: rgba(255,255,255,.6); }
+  .use-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .use-card {
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .use-card .emoji { font-size: 28px; margin-bottom: 12px; }
+  .use-card h3 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .use-card p { font-size: 13px; color: rgba(255,255,255,.6); }
+
+  /* HOW */
+  .steps {
+    display: flex;
+    gap: 0;
+    position: relative;
+    flex-wrap: wrap;
+  }
+  .steps::before {
+    content: '';
+    position: absolute;
+    top: 28px; left: 28px; right: 28px;
+    height: 2px;
+    background: var(--border);
+    z-index: 0;
+  }
+  .step {
+    flex: 1;
+    min-width: 160px;
+    text-align: center;
+    padding: 0 16px;
+    position: relative;
+    z-index: 1;
+  }
+  .step-circle {
+    width: 56px; height: 56px;
+    background: var(--blue);
+    color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 auto 16px;
+  }
+  .step h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .step p { font-size: 12px; color: var(--muted); }
+
+  /* FILTER */
+  .filter-section { background: #fff; }
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  .filter-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .filter-card .fi { font-size: 20px; flex-shrink: 0; }
+  .filter-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .filter-card p { font-size: 12px; color: var(--muted); }
+
+  /* FOOTER */
+  footer {
+    background: var(--navy);
+    color: rgba(255,255,255,.4);
+    text-align: center;
+    padding: 32px;
+    font-size: 13px;
+  }
+  footer strong { color: rgba(255,255,255,.8); }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    .steps::before { display: none; }
+    .data-flow { flex-direction: column; }
+    .data-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">INTERNAL TOOL — SALES ANALYTICS</div>
+  <h1>SF導入分析<span>ダッシュボード</span></h1>
+  <p>TSRオフラインDB × Salesforce導入実績データを組み合わせた、ターゲット企業分析ツール</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="num">248,479<span>社</span></div>
+      <div class="label">収録企業数</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">8<span>製品</span></div>
+      <div class="label">SF製品カバレッジ</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">47<span>都道府県</span></div>
+      <div class="label">地域分析対応</div>
+    </div>
+    <div class="hero-stat">
+      <div class="num">0<span>円</span></div>
+      <div class="label">追加ライセンス費用</div>
+    </div>
+  </div>
+</div>
+
+<!-- WHAT IS THIS -->
+<section>
+  <div class="container">
+    <div class="section-label">OVERVIEW</div>
+    <div class="section-title">このツールでできること</div>
+    <p class="section-sub">SalesforceのCRM導入データと東京商工リサーチの企業データを掛け合わせ、セールスターゲットの優先順位付けを支援します。</p>
+    <div class="what-grid">
+      <div class="what-card">
+        <div class="icon" style="background:#E8F1FF">📊</div>
+        <h3>SF導入率の地域・規模分析</h3>
+        <p>都道府県・地方ブロック別のSalesforce導入率を可視化。どのエリアに集中するべきかを一目で把握できます。</p>
+      </div>
+      <div class="what-card">
+        <div class="icon" style="background:#E8FFF6">🎯</div>
+        <h3>製品別ターゲット企業抽出</h3>
+        <p>Sales Cloud・Service Cloud・Marketing Cloudなど8製品ごとに、導入済み企業と未導入企業を絞り込めます。</p>
+      </div>
+      <div class="what-card">
+        <div class="icon" style="background:#FFF8E8">💡</div>
+        <h3>ホワイトスペース（空白市場）発見</h3>
+        <p>SF未導入だが類似規模の企業が多く導入しているセグメントを可視化し、アプローチ優先度を判断できます。</p>
+      </div>
+      <div class="what-card">
+        <div class="icon" style="background:#FFF0F0">🔍</div>
+        <h3>企業一覧の詳細検索</h3>
+        <p>会社名での検索、売上高・従業員数・AOVバンド・創業者フラグなど多軸フィルターで対象企業を絞り込めます。</p>
+      </div>
+      <div class="what-card">
+        <div class="icon" style="background:#F0F0FF">⚖️</div>
+        <h3>期間比較モード</h3>
+        <p>2つの異なる条件（業種・地域・規模）を並べて導入率を比較。「製造業 vs IT業」などの対比分析が可能です。</p>
+      </div>
+      <div class="what-card">
+        <div class="icon" style="background:#F0FFF8">🌱</div>
+        <h3>創業者フラグ分析</h3>
+        <p>創業者が経営する企業を特定。意思決定が速いオーナー系企業へのアプローチに活用できます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA SOURCES -->
+<section class="data-section">
+  <div class="container">
+    <div class="section-label">DATA</div>
+    <div class="section-title">使用データ</div>
+    <p class="section-sub">3つのデータソースを組み合わせた独自の分析基盤です。</p>
+    <div class="data-flow">
+      <div class="data-box">
+        <div class="tag">SOURCE 1</div>
+        <div class="name">Org62</div>
+        <div class="desc">SF社内CRM<br>導入企業マスター</div>
+      </div>
+      <div class="data-arrow">+</div>
+      <div class="data-box">
+        <div class="tag">SOURCE 2</div>
+        <div class="name">TSR企業DB</div>
+        <div class="desc">東京商工リサーチ<br>255,000社の企業情報</div>
+      </div>
+      <div class="data-arrow">+</div>
+      <div class="data-box">
+        <div class="tag">SOURCE 3</div>
+        <div class="name">KCDデータ</div>
+        <div class="desc">創業者フラグ<br>（オーナー企業判定）</div>
+      </div>
+      <div class="data-arrow">＝</div>
+      <div class="data-result">
+        <div class="tag">OUTPUT</div>
+        <div class="name">248,479社</div>
+        <div class="desc">ターゲット企業データベース<br>（SF導入状況付き）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section>
+  <div class="container">
+    <div class="section-label">FEATURES</div>
+    <div class="section-title">主要機能</div>
+    <p class="section-sub">セールスの現場で使いやすいよう設計された機能群です。</p>
+    <div class="feature-list">
+      <div class="feature-item">
+        <div class="feature-num">1</div>
+        <div class="feature-body">
+          <h3>地域・業種フィルター（グローバル）</h3>
+          <p>画面上部で地方ブロック・都道府県・業種・従業員規模を絞り込むと、全グラフがリアルタイムで連動更新されます。</p>
+          <div class="tags">
+            <span class="tag">地方ブロック</span>
+            <span class="tag">都道府県</span>
+            <span class="tag">業種</span>
+            <span class="tag">従業員規模</span>
+            <span class="tag">AOVバンド</span>
+            <span class="tag">創業者フラグ</span>
+          </div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-num">2</div>
+        <div class="feature-body">
+          <h3>SF製品別導入率グラフ</h3>
+          <p>Sales Cloud・Service Cloud・Marketing Cloud・Commerce Cloud など8製品について、絞り込み条件に合った企業内での導入率を棒グラフで表示します。</p>
+          <div class="tags">
+            <span class="tag">Sales Cloud</span>
+            <span class="tag">Service Cloud</span>
+            <span class="tag">Marketing Cloud</span>
+            <span class="tag">Commerce Cloud</span>
+            <span class="tag">Experience Cloud</span>
+            <span class="tag">他3製品</span>
+          </div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-num">3</div>
+        <div class="feature-body">
+          <h3>比較モード</h3>
+          <p>2条件を横並びで比較できるモードです。「東京vs大阪」「製造業vsIT業」などの対比が可能で、どちらのセグメントを優先すべきかを直感的に判断できます。</p>
+          <div class="tags">
+            <span class="tag">条件A vs 条件B</span>
+            <span class="tag">導入率比較</span>
+            <span class="tag">企業数比較</span>
+          </div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-num">4</div>
+        <div class="feature-body">
+          <h3>企業一覧（詳細フィルター付き）</h3>
+          <p>248,479社を一覧表示。会社名検索・SF導入済み/未導入の切り替え・売上高レンジ・従業員数レンジ・評点下限・AOVバンド・創業者フラグで絞り込めます。ページネーション付き。</p>
+          <div class="tags">
+            <span class="tag">テキスト検索</span>
+            <span class="tag">売上高レンジ</span>
+            <span class="tag">従業員数レンジ</span>
+            <span class="tag">評点</span>
+            <span class="tag">AOVバンド</span>
+            <span class="tag">創業者</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section class="use-section">
+  <div class="container">
+    <div class="section-label">USE CASES</div>
+    <div class="section-title">活用シーン</div>
+    <p class="section-sub">様々なセールス・マーケティングシーンでご活用いただけます。</p>
+    <div class="use-grid">
+      <div class="use-card">
+        <div class="emoji">🗾</div>
+        <h3>テリトリー計画</h3>
+        <p>担当エリアのSF導入率・空白市場をデータで把握し、四半期の訪問計画を立てる</p>
+      </div>
+      <div class="use-card">
+        <div class="emoji">🏭</div>
+        <h3>業種特化戦略</h3>
+        <p>製造業・金融業など特定業種のSF普及率を確認し、業種特化のピッチ資料を作成する</p>
+      </div>
+      <div class="use-card">
+        <div class="emoji">🌱</div>
+        <h3>オーナー企業開拓</h3>
+        <p>創業者フラグで意思決定者が経営する企業を特定し、決断が速い案件を優先する</p>
+      </div>
+      <div class="use-card">
+        <div class="emoji">📈</div>
+        <h3>アップセル発見</h3>
+        <p>Sales Cloud導入済みでService Cloud未導入の企業を抽出し、クロスセル・アップセル候補を絞る</p>
+      </div>
+      <div class="use-card">
+        <div class="emoji">💰</div>
+        <h3>AOV別優先度付け</h3>
+        <p>AOVバンドで高単価セグメントを絞り込み、エンタープライズ vs SMBの担当を最適化する</p>
+      </div>
+      <div class="use-card">
+        <div class="emoji">📊</div>
+        <h3>QBR資料作成</h3>
+        <p>グラフを使って地域・業種別の浸透率をQBR（四半期レビュー）スライドに盛り込む</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW TO USE -->
+<section class="filter-section">
+  <div class="container">
+    <div class="section-label">HOW TO USE</div>
+    <div class="section-title">起動方法</div>
+    <p class="section-sub">ZIPを展開してダブルクリックするだけです。</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-circle">1</div>
+        <h3>ZIPを展開</h3>
+        <p>受け取ったZIPファイルを適当なフォルダに展開する</p>
+      </div>
+      <div class="step">
+        <div class="step-circle">2</div>
+        <h3>起動スクリプトを実行</h3>
+        <p>Windows: <strong>ダッシュボードを開く.bat</strong><br>Mac: <strong>ダッシュボードを開く.command</strong></p>
+      </div>
+      <div class="step">
+        <div class="step-circle">3</div>
+        <h3>ブラウザが自動起動</h3>
+        <p>Chrome/Edge/Safariが自動で開き、ダッシュボードが表示される</p>
+      </div>
+      <div class="step">
+        <div class="step-circle">4</div>
+        <h3>フィルターで絞り込む</h3>
+        <p>上部のフィルターバーで条件を選択し、企業を絞り込む</p>
+      </div>
+    </div>
+
+    <div style="margin-top:40px">
+      <div class="section-label">FILTERS</div>
+      <div class="section-title" style="font-size:22px;margin-bottom:24px">使えるフィルター一覧</div>
+      <div class="filter-grid">
+        <div class="filter-card">
+          <div class="fi">🗾</div>
+          <div>
+            <h4>地方ブロック</h4>
+            <p>関東・近畿・東海など7ブロックで絞り込み</p>
+          </div>
+        </div>
+        <div class="filter-card">
+          <div class="fi">📍</div>
+          <div>
+            <h4>都道府県</h4>
+            <p>47都道府県から1つを選択</p>
+          </div>
+        </div>
+        <div class="filter-card">
+          <div class="fi">🏢</div>
+          <div>
+            <h4>業種</h4>
+            <p>製造・情報通信・金融など主要業種</p>
+          </div>
+        </div>
+        <div class="filter-card">
+          <div class="fi">👥</div>
+          <div>
+            <h4>従業員規模</h4>
+            <p>〜50名 / 51〜300名 / 301名〜 のレンジ</p>
+          </div>
+        </div>
+        <div class="filter-card">
+          <div class="fi">💴</div>
+          <div>
+            <h4>売上高レンジ</h4>
+            <p>最小〜最大の売上高帯で絞り込み</p>
+          </div>
+        </div>
+        <div class="filter-card">
+          <div class="fi">💰</div>
+          <div>
+            <h4>AOVバンド</h4>
+            <p>$1-10k〜$5M+ の8段階</p>
+          </div>
+        </div>
+        <div class="filter-card">
+          <div class="fi">⭐</div>
+          <div>
+            <h4>評点（下限）</h4>
+            <p>TSR評点の最低ラインを指定</p>
+          </div>
+        </div>
+        <div class="filter-card">
+          <div class="fi">🌱</div>
+          <div>
+            <h4>創業者フラグ</h4>
+            <p>オーナー経営者の企業のみに絞り込み</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <strong>SF導入分析ダッシュボード</strong> — Internal Use Only<br>
+  <span style="font-size:12px">データソース: Org62 × TSR オフラインDB × KCDデータ　|　対象企業数: 248,479社</span>
+</footer>
+
+</body>
+</html>
